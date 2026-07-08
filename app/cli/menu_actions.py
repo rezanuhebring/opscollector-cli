@@ -28,19 +28,51 @@ from app.services import (
 console = Console()
 
 
-def _ask(prompt: str, *, default: str = "") -> str:
-    """Prompt for a line of text (Windows console, no extra deps)."""
+def _read_line(prompt: str, *, default: str = "") -> str | None:
+    """Read a line via msvcrt; return None if the user presses Esc to cancel.
+
+    Unlike ``input()``, this lets the keyboard menu honour Esc for cancel at
+    any prompt, and still reads arrow-key sequences without echoing garbage.
+    """
     console.print(f"[cyan]{prompt}[/cyan]", end="")
     if default:
         console.print(f" [dim]({default})[/dim]", end="")
     console.print(": ", end="")
-    buf = default
-    # Use input() — works in the interactive console session.
-    try:
-        val = input()
-    except (EOFError, KeyboardInterrupt):
-        return buf
-    return val.strip() or default
+    buf: list[str] = []
+    esc_mode = False
+    while True:
+        ch = msvcrt.getwch()
+        if ch in ("\x00", "\xe0"):  # legacy extended key — discard scan code
+            msvcrt.getwch()
+            continue
+        if ch == "\x1b":  # lone ESC (cancel) or start of a VT sequence
+            nxt = msvcrt.getwch() if msvcrt.kbhit() else ""
+            if nxt == "[":  # arrow/etc — discard the rest of the sequence
+                msvcrt.getwch()
+                continue
+            console.print()  # user cancelled
+            return None
+        if ch == "\r":  # Enter
+            console.print()
+            val = "".join(buf).strip()
+            return val or default
+        if ch == "\x08":  # Backspace
+            if buf:
+                buf.pop()
+                console.print("\b \b", end="")
+        elif ch.isprintable():
+            buf.append(ch)
+            console.print(ch, end="")
+        # ignore other control chars (Ctrl-C handled by runtime)
+
+
+def _ask(prompt: str, *, default: str = "") -> str:
+    """Prompt for a line of text. Returns empty string if cancelled with Esc."""
+    val = _read_line(prompt, default=default)
+    if val is None:
+        console.print("[yellow]! cancelled[/yellow]")
+        return ""
+    return val
 
 
 def _ask_int(prompt: str, *, default: int = 0) -> int | None:
@@ -199,6 +231,212 @@ def evidence_list_flow() -> None:
         return
     for r in rows:
         console.print(f"  [{r['id']}] {r.get('title') or r['original_filename']} ({r['extension']})")
+
+
+# --- CRUD submenu flows --------------------------------------------------
+def _pick_id(rows: list[dict], label: str) -> int | None:
+    """Let the user choose a record id from a list view; None if cancelled."""
+    if not rows:
+        console.print("[dim](no records)[/dim]")
+        return None
+    for r in rows[:25]:
+        rid = r.get("id")
+        summary = r.get("title") or r.get("date") or r.get("name") or rid
+        console.print(f"  [{rid}] {summary}")
+    raw = _ask_int(f"{label} ID (Esc to cancel)")
+    if raw is None:
+        return None
+    return raw
+
+
+def _confirm(prompt: str) -> bool:
+    ans = _read_line(prompt + " [y/N]")
+    if ans is None:
+        return False
+    return ans.strip().lower() in ("y", "yes")
+
+
+def incident_edit_flow() -> None:
+    rows = IncidentService().list(limit=50)
+    iid = _pick_id(rows, "Incident")
+    if iid is None:
+        return
+    title = _ask("Title")
+    severity = _ask("Severity", default="Medium")
+    desc = _ask("Description")
+    fields = {}
+    if title:
+        fields["title"] = title
+    if severity:
+        fields["severity"] = severity
+    if desc:
+        fields["description"] = desc
+    if not fields:
+        console.print("[yellow]! nothing to change[/yellow]")
+        return
+    try:
+        rec = IncidentService().update(iid, **fields)
+        console.print(f"[green]✓ Incident {rec['incident_no']} updated[/green]")
+    except Exception as exc:
+        console.print(f"[red]! {exc}[/red]")
+
+
+def incident_delete_flow() -> None:
+    rows = IncidentService().list(limit=50)
+    iid = _pick_id(rows, "Incident")
+    if iid is None:
+        return
+    if not _confirm(f"Delete incident #{iid}?"):
+        console.print("[dim]cancelled[/dim]")
+        return
+    try:
+        IncidentService().delete(iid)
+        console.print(f"[green]✓ Incident #{iid} deleted[/green]")
+    except Exception as exc:
+        console.print(f"[red]! {exc}[/red]")
+
+
+def bau_edit_flow() -> None:
+    rows = BAUService().list(limit=50)
+    bid = _pick_id(rows, "BAU")
+    if bid is None:
+        return
+    title = _ask("Title")
+    desc = _ask("Description")
+    status_id = _ask_int("Status ID", default=0)
+    fields = {}
+    if title:
+        fields["title"] = title
+    if desc:
+        fields["description"] = desc
+    if status_id:
+        fields["status_id"] = status_id
+    if not fields:
+        console.print("[yellow]! nothing to change[/yellow]")
+        return
+    try:
+        rec = BAUService().update(bid, **fields)
+        console.print(f"[green]✓ BAU #{rec['id']} updated[/green]")
+    except Exception as exc:
+        console.print(f"[red]! {exc}[/red]")
+
+
+def bau_delete_flow() -> None:
+    rows = BAUService().list(limit=50)
+    bid = _pick_id(rows, "BAU")
+    if bid is None:
+        return
+    if not _confirm(f"Delete BAU #{bid}?"):
+        console.print("[dim]cancelled[/dim]")
+        return
+    try:
+        BAUService().delete(bid)
+        console.print(f"[green]✓ BAU #{bid} deleted[/green]")
+    except Exception as exc:
+        console.print(f"[red]! {exc}[/red]")
+
+
+def change_edit_flow() -> None:
+    rows = ChangeService().list(limit=50)
+    cid = _pick_id(rows, "Change")
+    if cid is None:
+        return
+    title = _ask("Title")
+    ctype = _ask("Change type", default="Change")
+    desc = _ask("Description")
+    fields = {}
+    if title:
+        fields["title"] = title
+    if ctype:
+        fields["change_type"] = ctype
+    if desc:
+        fields["description"] = desc
+    if not fields:
+        console.print("[yellow]! nothing to change[/yellow]")
+        return
+    try:
+        rec = ChangeService().update(cid, **fields)
+        console.print(f"[green]✓ Change #{rec['id']} updated[/green]")
+    except Exception as exc:
+        console.print(f"[red]! {exc}[/red]")
+
+
+def change_delete_flow() -> None:
+    rows = ChangeService().list(limit=50)
+    cid = _pick_id(rows, "Change")
+    if cid is None:
+        return
+    if not _confirm(f"Delete change #{cid}?"):
+        console.print("[dim]cancelled[/dim]")
+        return
+    try:
+        ChangeService().delete(cid)
+        console.print(f"[green]✓ Change #{cid} deleted[/green]")
+    except Exception as exc:
+        console.print(f"[red]! {exc}[/red]")
+
+
+def evidence_delete_flow() -> None:
+    rows = EvidenceService().list(limit=50)
+    eid = _pick_id(rows, "Evidence")
+    if eid is None:
+        return
+    if not _confirm(f"Delete evidence #{eid} (removes file)?"):
+        console.print("[dim]cancelled[/dim]")
+        return
+    try:
+        EvidenceService().delete(eid, remove_file=True)
+        console.print(f"[green]✓ Evidence #{eid} deleted[/green]")
+    except Exception as exc:
+        console.print(f"[red]! {exc}[/red]")
+
+
+def master_edit_flow() -> None:
+    types = MasterService().list_types()
+    console.print("[bold]Master entities:[/bold] " + ", ".join(types))
+    entity = _ask("Entity type")
+    if not entity:
+        return
+    rows = MasterService().list(entity)
+    mid = _pick_id(rows, entity)
+    if mid is None:
+        return
+    name = _ask("Name")
+    extra: dict = {}
+    if entity.lower() in ("objective", "key_result"):
+        extra["title"] = _ask("Title")
+    fields = {}
+    if name:
+        fields["name"] = name
+    fields.update({k: v for k, v in extra.items() if v})
+    if not fields:
+        console.print("[yellow]! nothing to change[/yellow]")
+        return
+    try:
+        rec = MasterService().update(entity, mid, **fields)
+        console.print(f"[green]✓ {entity} #{rec['id']} updated[/green]")
+    except Exception as exc:
+        console.print(f"[red]! {exc}[/red]")
+
+
+def master_delete_flow() -> None:
+    types = MasterService().list_types()
+    console.print("[bold]Master entities:[/bold] " + ", ".join(types))
+    entity = _ask("Entity type")
+    if not entity:
+        return
+    rows = MasterService().list(entity)
+    mid = _pick_id(rows, entity)
+    if mid is None:
+        return
+    if not _confirm(f"Delete {entity} #{mid}?"):
+        console.print("[dim]cancelled[/dim]")
+        return
+    try:
+        MasterService().delete(entity, mid)
+        console.print(f"[green]✓ {entity} #{mid} deleted[/green]")
+    except Exception as exc:
+        console.print(f"[red]! {exc}[/red]")
 
 
 # --- Views ---------------------------------------------------------------

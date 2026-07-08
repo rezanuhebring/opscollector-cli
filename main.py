@@ -32,18 +32,28 @@ from app.cli.menu_actions import (
     about_flow,
     backup_flow,
     bau_add_flow,
+    bau_delete_flow,
+    bau_edit_flow,
     bau_list_flow,
     change_add_flow,
+    change_delete_flow,
+    change_edit_flow,
     change_list_flow,
     dashboard_flow,
     evidence_add_flow,
+    evidence_delete_flow,
     evidence_list_flow,
     excel_export_flow,
     excel_import_flow,
     incident_add_flow,
+    incident_delete_flow,
+    incident_edit_flow,
     incident_list_flow,
     load_demo_flow,
     master_add_flow,
+    master_delete_flow,
+    master_edit_flow,
+    master_list_flow,
     search_flow,
 )
 from app.core.logging_config import get_logger
@@ -96,22 +106,49 @@ def _version_callback(value: bool) -> None:
 
 
 def _build_menu() -> list[interactive.MenuItem]:
-    """Top-level keyboard-menu items, mapped to service-backed flows."""
+    """Top-level keyboard-menu items, mapped to service-backed flows.
+
+    CRUD lives inside each entity submenu (e.g. Incident -> List / Create /
+    Edit / Delete) so the front menu stays clean and uncluttered.
+    """
+    def sub(label: str, desc: str, items: list[interactive.MenuItem]) -> interactive.MenuItem:
+        return interactive.MenuItem(label, desc, submenu=items)
+
     return [
-        interactive.MenuItem("Daily BAU", "Log daily business-as-usual", bau_add_flow),
-        interactive.MenuItem("Incident", "Log an operational incident", incident_add_flow),
-        interactive.MenuItem("Change / Maint.", "Log a change or maintenance", change_add_flow),
-        interactive.MenuItem("Evidence", "Add a file to the evidence repo", evidence_add_flow),
-        interactive.MenuItem("Master Data", "Add/list reference data", master_add_flow),
-        interactive.MenuItem("List Incidents", "View logged incidents", incident_list_flow),
-        interactive.MenuItem("List BAU", "View BAU records", bau_list_flow),
-        interactive.MenuItem("List Changes", "View change records", change_list_flow),
-        interactive.MenuItem("List Evidence", "View evidence register", evidence_list_flow),
-        interactive.MenuItem("Import Excel/CSV", "Bulk import from a file", excel_import_flow),
-        interactive.MenuItem("Load Demo Data", "Populate example data", load_demo_flow),
+        sub("Incident", "Incidents: list / create / edit / delete", [
+            interactive.MenuItem("List", "View logged incidents", incident_list_flow),
+            interactive.MenuItem("Create", "Log a new incident", incident_add_flow),
+            interactive.MenuItem("Edit", "Update an incident", incident_edit_flow),
+            interactive.MenuItem("Delete", "Remove an incident", incident_delete_flow),
+        ]),
+        sub("Daily BAU", "BAU: list / create / edit / delete", [
+            interactive.MenuItem("List", "View BAU records", bau_list_flow),
+            interactive.MenuItem("Create", "Log daily business-as-usual", bau_add_flow),
+            interactive.MenuItem("Edit", "Update a BAU record", bau_edit_flow),
+            interactive.MenuItem("Delete", "Remove a BAU record", bau_delete_flow),
+        ]),
+        sub("Change / Maint.", "Changes: list / create / edit / delete", [
+            interactive.MenuItem("List", "View change records", change_list_flow),
+            interactive.MenuItem("Create", "Log a change or maintenance", change_add_flow),
+            interactive.MenuItem("Edit", "Update a change record", change_edit_flow),
+            interactive.MenuItem("Delete", "Remove a change record", change_delete_flow),
+        ]),
+        sub("Evidence", "Evidence: list / add / delete", [
+            interactive.MenuItem("List", "View evidence register", evidence_list_flow),
+            interactive.MenuItem("Add", "Add a file to the evidence repo", evidence_add_flow),
+            interactive.MenuItem("Delete", "Remove evidence (and file)", evidence_delete_flow),
+        ]),
+        sub("Master Data", "Reference data: list / create / edit / delete", [
+            interactive.MenuItem("List", "View master records", master_list_flow),
+            interactive.MenuItem("Create", "Add a master record", master_add_flow),
+            interactive.MenuItem("Edit", "Update a master record", master_edit_flow),
+            interactive.MenuItem("Delete", "Remove a master record", master_delete_flow),
+        ]),
         interactive.MenuItem("Dashboard", "View operational summary", dashboard_flow),
-        interactive.MenuItem("Search", "Search operational data", search_flow),
+        interactive.MenuItem("Import Excel/CSV", "Bulk import from a file", excel_import_flow),
         interactive.MenuItem("Excel Export", "Export a report to Excel", excel_export_flow),
+        interactive.MenuItem("Search", "Search operational data", search_flow),
+        interactive.MenuItem("Load Demo Data", "Populate example data", load_demo_flow),
         interactive.MenuItem("Backup", "Create a timestamped backup", backup_flow),
         interactive.MenuItem("About", "Version and help", about_flow),
     ]

@@ -154,6 +154,16 @@ def _navigate(title: str, items: list[MenuItem], *, top_items: list[MenuItem]) -
 
 
 def _pause() -> None:
-    sys.stdout.write("\n  Press any key to continue...")
+    sys.stdout.write("\n  Press any key to continue (Esc to skip)...")
     sys.stdout.flush()
-    msvcrt.getwch()
+    try:
+        ch = msvcrt.getwch()
+        # Drain any extended/VT sequence so it doesn't leak into the next read.
+        if ch in ("\x00", "\xe0"):
+            msvcrt.getwch()
+        elif ch == "\x1b" and msvcrt.kbhit() and msvcrt.getwch() == "[":
+            msvcrt.getwch()
+    except Exception:
+        pass
+
+
