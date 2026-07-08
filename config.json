@@ -1,0 +1,27 @@
+{
+  "app_name": "OpsCollector-CLI",
+  "version": "1.0.0",
+  "database": {
+    "filename": "opscollector.db",
+    "directory": "database"
+  },
+  "paths": {
+    "evidence_dir": "evidence",
+    "export_dir": "export",
+    "backup_dir": "backup",
+    "logs_dir": "logs",
+    "templates_dir": "app/templates"
+  },
+  "evidence": {
+    "allowed_extensions": ["png", "jpg", "jpeg", "pdf", "docx", "xlsx", "txt", "log", "zip"],
+    "max_size_mb": 100
+  },
+  "logging": {
+    "level": "INFO",
+    "format": "%(asctime)s | %(levelname)-8s | %(name)s | %(message)s"
+  },
+  "ui": {
+    "date_format": "%Y-%m-%d",
+    "datetime_format": "%Y-%m-%d %H:%M:%S"
+  }
+}

@@ -1,0 +1,28 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+
+# App data (keep structure, ignore contents)
+database/*.db
+database/*.db-journal
+evidence/**
+export/**
+backup/**
+logs/**
+!evidence/.gitkeep
+!export/.gitkeep
+!backup/.gitkeep
+!logs/.gitkeep
+
+# Editor / OS
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+
+# Test caches
+.pytest_cache/
+*.cover

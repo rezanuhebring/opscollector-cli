@@ -1,0 +1,30 @@
+# OpsCollector-CLI dependencies (Python >= 3.11)
+# Managed by setup.ps1 / update.ps1
+
+# CLI
+typer>=0.12.0
+rich>=13.7.0
+
+# Database
+SQLAlchemy>=2.0.30
+
+# Excel
+openpyxl>=3.1.2
+
+# Word
+python-docx>=1.1.0
+
+# PDF
+reportlab>=4.2.0
+
+# Image
+Pillow>=10.3.0
+
+# File monitoring
+watchdog>=4.0.0
+
+# Configuration
+pydantic>=2.7.0
+
+# Testing
+pytest>=8.2.0
