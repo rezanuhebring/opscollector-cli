@@ -10,8 +10,11 @@ Controls
 - ``Enter``          -> select the highlighted item
 - ``Esc``            -> go back one level (or exit at the root)
 
-The engine is intentionally tiny and generic: it renders a list of
-``MenuItem`` and dispatches a callback when an item is chosen.
+Key decoding is robust to two encodings used by Windows consoles:
+* Legacy conhost: arrow keys arrive as ``\\x00`` (or ``\\xe0``) + scan code.
+* Windows Terminal / ConPTY (VT mode): arrow keys arrive as ``\\x1b[`` + letter.
+Both are normalised to canonical tokens so the menu works in cmd.exe,
+PowerShell, and Windows Terminal alike.
 """
 
 from __future__ import annotations
@@ -21,15 +24,19 @@ import sys
 from dataclasses import dataclass, field
 from typing import Callable
 
-# Windows virtual-key codes returned by msvcrt.getwch() in "extended" mode.
-# Extended keys arrive as a two-byte sequence: 0x00 (or 0xe0) then the code.
-_VK_UP = "\x00H"  # 0x48
-_VK_DOWN = "\x00P"  # 0x50
-_VK_LEFT = "\x00K"  # 0x4b
-_VK_RIGHT = "\x00M"  # 0x4d
-_VK_ESC = "\x1b"
-_VK_ENTER = "\r"
-_VK_CTRL_C = "\x03"
+# Canonical key tokens returned by _read_key().
+UP = "UP"
+DOWN = "DOWN"
+LEFT = "LEFT"
+RIGHT = "RIGHT"
+ENTER = "ENTER"
+ESC = "ESC"
+CTRL_C = "CTRL_C"
+
+# Legacy console scan codes (after the 0x00 / 0xe0 prefix).
+_LEGACY = {"H": UP, "P": DOWN, "K": LEFT, "M": RIGHT}
+# VT sequences (after the ESC [ prefix).
+_VT = {"A": UP, "B": DOWN, "C": RIGHT, "D": LEFT}
 
 
 @dataclass
@@ -50,15 +57,34 @@ _BLANK_PTR = " "
 
 
 def _read_key() -> str:
-    """Read a single key, normalising extended keys into 2-char codes."""
+    """Read a single key, normalising extended/VT keys to canonical tokens.
+
+    Returns one of the canonical tokens (UP/DOWN/LEFT/RIGHT/ENTER/ESC/CTRL_C)
+    or the literal character typed.
+    """
     ch = msvcrt.getwch()
-    if ch in ("\x00", "\xe0"):  # prefix for extended keys
-        return ch + msvcrt.getwch()
+    # Legacy extended key: 0x00 or 0xe0 prefix followed by a scan code.
+    if ch in ("\x00", "\xe0"):
+        code = msvcrt.getwch()
+        return _LEGACY.get(code, ch + code)
+    # VT / ANSI sequence (Windows Terminal, ConPTY): ESC [ <letter>
+    if ch == "\x1b":
+        nxt = msvcrt.getwch()
+        if nxt == "[":
+            code = msvcrt.getwch()
+            return _VT.get(code, ESC)
+        # A lone ESC (not the start of a CSI sequence) -> treat as Esc.
+        return ESC
+    if ch == "\r":
+        return ENTER
+    if ch == "\x03":
+        return CTRL_C
     return ch
 
 
 def _render(title: str, items: list[MenuItem], selected: int) -> None:
-    sys.stdout.write("\x1b[2J\x1b[H")  # clear screen, home cursor
+    if sys.stdout.isatty():
+        sys.stdout.write("\x1b[2J\x1b[H")  # clear screen, home cursor (VT)
     print(_TOP)
     header = f"  {title}"
     print(f"{_SIDE}{header.ljust(56)}{_SIDE}")
@@ -97,11 +123,9 @@ def _navigate(title: str, items: list[MenuItem], *, top_items: list[MenuItem]) -
     while True:
         _render(title, items, selected)
         key = _read_key()
-        if key == _VK_ESC:
-            if items is top_items:
-                return  # exit application
-            return  # back to parent (caller loop)
-        if key == _VK_ENTER:
+        if key == ESC:
+            return  # back to parent (or exit at root)
+        if key == ENTER:
             item = items[selected]
             if item.submenu:
                 _navigate(item.label, item.submenu, top_items=top_items)
@@ -115,17 +139,17 @@ def _navigate(title: str, items: list[MenuItem], *, top_items: list[MenuItem]) -
             _pause()
             continue
         # movement
-        if key == _VK_DOWN:
+        if key == DOWN:
             selected = (selected + 1) % len(items)
-        elif key == _VK_UP:
+        elif key == UP:
             selected = (selected - 1) % len(items)
-        elif key == _VK_RIGHT and cols == 2:
+        elif key == RIGHT and cols == 2:
             if selected + 1 < len(items) and (selected % 2 == 0):
                 selected += 1
-        elif key == _VK_LEFT and cols == 2:
+        elif key == LEFT and cols == 2:
             if selected - 1 >= 0 and (selected % 2 == 1):
                 selected -= 1
-        elif key == _VK_CTRL_C:
+        elif key == CTRL_C:
             raise KeyboardInterrupt
 
 
