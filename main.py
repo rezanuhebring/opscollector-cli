@@ -47,7 +47,10 @@ def _ensure_db() -> None:
 app = typer.Typer(
     name="opscollector",
     help="OpsCollector-CLI — Capture Once. Report Everywhere.",
-    no_args_is_help=True,
+    # NOTE: no_args_is_help is intentionally False so that running the app with
+    # no arguments reaches this module's callback (which launches the keyboard
+    # menu). With it True, Typer would print help and exit before the menu.
+    no_args_is_help=False,
 )
 
 app.add_typer(master_cmd.app, name="master")
@@ -85,7 +88,7 @@ def _build_menu() -> list[interactive.MenuItem]:
     ]
 
 
-@app.callback()
+@app.callback(invoke_without_command=True)
 def main(
     version: bool = typer.Option(False, "--version", callback=_version_callback, is_eager=True),
     cli: bool = typer.Option(False, "--cli", help="Use the typed command-line interface instead of the keyboard menu"),
