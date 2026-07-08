@@ -122,16 +122,35 @@ def master_add_flow() -> None:
 
 
 def master_list_flow() -> None:
+    from app.cli.record_browser import browse, BrowserSpec
+
     types = MasterService().list_types()
     entity = _ask("Entity type", default=types[0] if types else "")
     if not entity:
         return
-    rows = MasterService().list(entity)
-    if not rows:
-        console.print("[dim](no records)[/dim]")
-        return
-    for r in rows[:25]:
-        console.print(f"  [{r['id']}] {r.get('name', '')}")
+
+    def load(limit, offset):
+        return MasterService().list(entity, limit=limit, offset=offset)
+
+    def summary(r):
+        return r.get("name") or str(r.get("id"))
+
+    def fields(r):
+        items = [(k, v) for k, v in r.items() if k not in ("id",)]
+        return items or [("id", r.get("id"))]
+
+    def editable(r):
+        out = [("name", "Name", r.get("name") or "")]
+        if entity.lower() in ("objective", "key_result"):
+            out.append(("title", "Title", r.get("title") or ""))
+        return out
+
+    browse(BrowserSpec(
+        title=f"Master: {entity}",
+        load=load, fields=fields, editable_fields=editable, summary=summary,
+        save=lambda rid, ch: MasterService().update(entity, rid, **ch),
+        delete=lambda rid: MasterService().delete(entity, rid),
+    ))
 
 
 # --- Operational flows ---------------------------------------------------
@@ -154,12 +173,37 @@ def bau_add_flow() -> None:
 
 
 def bau_list_flow() -> None:
-    rows = BAUService().list(limit=25)
-    if not rows:
-        console.print("[dim](no BAU records)[/dim]")
-        return
-    for r in rows:
-        console.print(f"  [{r['id']}] {r['date']} — {r['title']} [{r.get('status_id')}]")
+    from app.cli.record_browser import browse, BrowserSpec
+
+    def summary(r):
+        return f"{r['date']} — {r['title']} [{r.get('status_id')}]"
+
+    def fields(r):
+        return [
+            ("Date", r["date"]),
+            ("Title", r["title"]),
+            ("Description", r.get("description") or ""),
+            ("Status ID", r.get("status_id")),
+            ("PIC ID", r.get("pic_id")),
+            ("Dept ID", r.get("department_id")),
+        ]
+
+    def editable(r):
+        return [
+            ("title", "Title", r["title"]),
+            ("description", "Description", r.get("description") or ""),
+            ("status_id", "Status ID", r.get("status_id") or ""),
+            ("pic_id", "PIC ID", r.get("pic_id") or ""),
+            ("department_id", "Dept ID", r.get("department_id") or ""),
+        ]
+
+    browse(BrowserSpec(
+        title="Daily BAU",
+        load=lambda limit, offset: BAUService().list(limit=limit, offset=offset),
+        fields=fields, editable_fields=editable, summary=summary,
+        save=lambda rid, ch: BAUService().update(rid, **{k: (int(v) if v.isdigit() else v) for k, v in ch.items()}),
+        delete=lambda rid: BAUService().delete(rid),
+    ))
 
 
 def incident_add_flow() -> None:
@@ -178,12 +222,41 @@ def incident_add_flow() -> None:
 
 
 def incident_list_flow() -> None:
-    rows = IncidentService().list(limit=25)
-    if not rows:
-        console.print("[dim](no incidents)[/dim]")
-        return
-    for r in rows:
-        console.print(f"  [{r['id']}] {r['date']} — {r['title']} ({r['severity']})")
+    from app.cli.record_browser import browse, BrowserSpec
+
+    def summary(r):
+        return f"{r['date']} — {r['title']} ({r['severity']})"
+
+    def fields(r):
+        return [
+            ("No", r.get("incident_no")),
+            ("Date", r["date"]),
+            ("Title", r["title"]),
+            ("Severity", r["severity"]),
+            ("Status ID", r.get("status_id")),
+            ("PIC ID", r.get("pic_id")),
+            ("Dept ID", r.get("department_id")),
+        ]
+
+    def editable(r):
+        return [
+            ("title", "Title", r["title"]),
+            ("severity", "Severity", r["severity"]),
+            ("description", "Description", r.get("description") or ""),
+            ("root_cause", "Root cause", r.get("root_cause") or ""),
+            ("resolution", "Resolution", r.get("resolution") or ""),
+            ("status_id", "Status ID", r.get("status_id") or ""),
+            ("pic_id", "PIC ID", r.get("pic_id") or ""),
+            ("department_id", "Dept ID", r.get("department_id") or ""),
+        ]
+
+    browse(BrowserSpec(
+        title="Incident",
+        load=lambda limit, offset: IncidentService().list(limit=limit, offset=offset),
+        fields=fields, editable_fields=editable, summary=summary,
+        save=lambda rid, ch: IncidentService().update(rid, **{k: (int(v) if v.isdigit() else v) for k, v in ch.items()}),
+        delete=lambda rid: IncidentService().delete(rid),
+    ))
 
 
 def change_add_flow() -> None:
@@ -202,12 +275,40 @@ def change_add_flow() -> None:
 
 
 def change_list_flow() -> None:
-    rows = ChangeService().list(limit=25)
-    if not rows:
-        console.print("[dim](no changes)[/dim]")
-        return
-    for r in rows:
-        console.print(f"  [{r['id']}] {r['date']} — {r['title']} ({r.get('change_type')})")
+    from app.cli.record_browser import browse, BrowserSpec
+
+    def summary(r):
+        return f"{r['date']} — {r['title']} ({r.get('change_type')})"
+
+    def fields(r):
+        return [
+            ("No", r.get("change_no")),
+            ("Date", r["date"]),
+            ("Title", r["title"]),
+            ("Type", r.get("change_type")),
+            ("Status ID", r.get("status_id")),
+            ("PIC ID", r.get("pic_id")),
+            ("Dept ID", r.get("department_id")),
+        ]
+
+    def editable(r):
+        return [
+            ("title", "Title", r["title"]),
+            ("change_type", "Type", r.get("change_type") or ""),
+            ("description", "Description", r.get("description") or ""),
+            ("result", "Result", r.get("result") or ""),
+            ("status_id", "Status ID", r.get("status_id") or ""),
+            ("pic_id", "PIC ID", r.get("pic_id") or ""),
+            ("department_id", "Dept ID", r.get("department_id") or ""),
+        ]
+
+    browse(BrowserSpec(
+        title="Change / Maint.",
+        load=lambda limit, offset: ChangeService().list(limit=limit, offset=offset),
+        fields=fields, editable_fields=editable, summary=summary,
+        save=lambda rid, ch: ChangeService().update(rid, **{k: (int(v) if v.isdigit() else v) for k, v in ch.items()}),
+        delete=lambda rid: ChangeService().delete(rid),
+    ))
 
 
 def evidence_add_flow() -> None:
@@ -225,218 +326,35 @@ def evidence_add_flow() -> None:
 
 
 def evidence_list_flow() -> None:
-    rows = EvidenceService().list(limit=25)
-    if not rows:
-        console.print("[dim](no evidence)[/dim]")
-        return
-    for r in rows:
-        console.print(f"  [{r['id']}] {r.get('title') or r['original_filename']} ({r['extension']})")
+    from app.cli.record_browser import browse, BrowserSpec
 
+    def summary(r):
+        return f"{r.get('title') or r['original_filename']} ({r['extension']})"
 
-# --- CRUD submenu flows --------------------------------------------------
-def _pick_id(rows: list[dict], label: str) -> int | None:
-    """Let the user choose a record id from a list view; None if cancelled."""
-    if not rows:
-        console.print("[dim](no records)[/dim]")
-        return None
-    for r in rows[:25]:
-        rid = r.get("id")
-        summary = r.get("title") or r.get("date") or r.get("name") or rid
-        console.print(f"  [{rid}] {summary}")
-    raw = _ask_int(f"{label} ID (Esc to cancel)")
-    if raw is None:
-        return None
-    return raw
+    def fields(r):
+        return [
+            ("Title", r.get("title") or r["original_filename"]),
+            ("Original file", r["original_filename"]),
+            ("Extension", r["extension"]),
+            ("Size (bytes)", r.get("size_bytes")),
+            ("Category ID", r.get("evidence_category_id")),
+            ("Entity", f"{r.get('entity_type')}#{r.get('entity_id')}"),
+            ("Uploaded", str(r.get("uploaded_at"))),
+        ]
 
+    def editable(r):
+        return [
+            ("title", "Title", r.get("title") or ""),
+            ("description", "Description", r.get("description") or ""),
+        ]
 
-def _confirm(prompt: str) -> bool:
-    ans = _read_line(prompt + " [y/N]")
-    if ans is None:
-        return False
-    return ans.strip().lower() in ("y", "yes")
-
-
-def incident_edit_flow() -> None:
-    rows = IncidentService().list(limit=50)
-    iid = _pick_id(rows, "Incident")
-    if iid is None:
-        return
-    title = _ask("Title")
-    severity = _ask("Severity", default="Medium")
-    desc = _ask("Description")
-    fields = {}
-    if title:
-        fields["title"] = title
-    if severity:
-        fields["severity"] = severity
-    if desc:
-        fields["description"] = desc
-    if not fields:
-        console.print("[yellow]! nothing to change[/yellow]")
-        return
-    try:
-        rec = IncidentService().update(iid, **fields)
-        console.print(f"[green]✓ Incident {rec['incident_no']} updated[/green]")
-    except Exception as exc:
-        console.print(f"[red]! {exc}[/red]")
-
-
-def incident_delete_flow() -> None:
-    rows = IncidentService().list(limit=50)
-    iid = _pick_id(rows, "Incident")
-    if iid is None:
-        return
-    if not _confirm(f"Delete incident #{iid}?"):
-        console.print("[dim]cancelled[/dim]")
-        return
-    try:
-        IncidentService().delete(iid)
-        console.print(f"[green]✓ Incident #{iid} deleted[/green]")
-    except Exception as exc:
-        console.print(f"[red]! {exc}[/red]")
-
-
-def bau_edit_flow() -> None:
-    rows = BAUService().list(limit=50)
-    bid = _pick_id(rows, "BAU")
-    if bid is None:
-        return
-    title = _ask("Title")
-    desc = _ask("Description")
-    status_id = _ask_int("Status ID", default=0)
-    fields = {}
-    if title:
-        fields["title"] = title
-    if desc:
-        fields["description"] = desc
-    if status_id:
-        fields["status_id"] = status_id
-    if not fields:
-        console.print("[yellow]! nothing to change[/yellow]")
-        return
-    try:
-        rec = BAUService().update(bid, **fields)
-        console.print(f"[green]✓ BAU #{rec['id']} updated[/green]")
-    except Exception as exc:
-        console.print(f"[red]! {exc}[/red]")
-
-
-def bau_delete_flow() -> None:
-    rows = BAUService().list(limit=50)
-    bid = _pick_id(rows, "BAU")
-    if bid is None:
-        return
-    if not _confirm(f"Delete BAU #{bid}?"):
-        console.print("[dim]cancelled[/dim]")
-        return
-    try:
-        BAUService().delete(bid)
-        console.print(f"[green]✓ BAU #{bid} deleted[/green]")
-    except Exception as exc:
-        console.print(f"[red]! {exc}[/red]")
-
-
-def change_edit_flow() -> None:
-    rows = ChangeService().list(limit=50)
-    cid = _pick_id(rows, "Change")
-    if cid is None:
-        return
-    title = _ask("Title")
-    ctype = _ask("Change type", default="Change")
-    desc = _ask("Description")
-    fields = {}
-    if title:
-        fields["title"] = title
-    if ctype:
-        fields["change_type"] = ctype
-    if desc:
-        fields["description"] = desc
-    if not fields:
-        console.print("[yellow]! nothing to change[/yellow]")
-        return
-    try:
-        rec = ChangeService().update(cid, **fields)
-        console.print(f"[green]✓ Change #{rec['id']} updated[/green]")
-    except Exception as exc:
-        console.print(f"[red]! {exc}[/red]")
-
-
-def change_delete_flow() -> None:
-    rows = ChangeService().list(limit=50)
-    cid = _pick_id(rows, "Change")
-    if cid is None:
-        return
-    if not _confirm(f"Delete change #{cid}?"):
-        console.print("[dim]cancelled[/dim]")
-        return
-    try:
-        ChangeService().delete(cid)
-        console.print(f"[green]✓ Change #{cid} deleted[/green]")
-    except Exception as exc:
-        console.print(f"[red]! {exc}[/red]")
-
-
-def evidence_delete_flow() -> None:
-    rows = EvidenceService().list(limit=50)
-    eid = _pick_id(rows, "Evidence")
-    if eid is None:
-        return
-    if not _confirm(f"Delete evidence #{eid} (removes file)?"):
-        console.print("[dim]cancelled[/dim]")
-        return
-    try:
-        EvidenceService().delete(eid, remove_file=True)
-        console.print(f"[green]✓ Evidence #{eid} deleted[/green]")
-    except Exception as exc:
-        console.print(f"[red]! {exc}[/red]")
-
-
-def master_edit_flow() -> None:
-    types = MasterService().list_types()
-    console.print("[bold]Master entities:[/bold] " + ", ".join(types))
-    entity = _ask("Entity type")
-    if not entity:
-        return
-    rows = MasterService().list(entity)
-    mid = _pick_id(rows, entity)
-    if mid is None:
-        return
-    name = _ask("Name")
-    extra: dict = {}
-    if entity.lower() in ("objective", "key_result"):
-        extra["title"] = _ask("Title")
-    fields = {}
-    if name:
-        fields["name"] = name
-    fields.update({k: v for k, v in extra.items() if v})
-    if not fields:
-        console.print("[yellow]! nothing to change[/yellow]")
-        return
-    try:
-        rec = MasterService().update(entity, mid, **fields)
-        console.print(f"[green]✓ {entity} #{rec['id']} updated[/green]")
-    except Exception as exc:
-        console.print(f"[red]! {exc}[/red]")
-
-
-def master_delete_flow() -> None:
-    types = MasterService().list_types()
-    console.print("[bold]Master entities:[/bold] " + ", ".join(types))
-    entity = _ask("Entity type")
-    if not entity:
-        return
-    rows = MasterService().list(entity)
-    mid = _pick_id(rows, entity)
-    if mid is None:
-        return
-    if not _confirm(f"Delete {entity} #{mid}?"):
-        console.print("[dim]cancelled[/dim]")
-        return
-    try:
-        MasterService().delete(entity, mid)
-        console.print(f"[green]✓ {entity} #{mid} deleted[/green]")
-    except Exception as exc:
-        console.print(f"[red]! {exc}[/red]")
+    browse(BrowserSpec(
+        title="Evidence",
+        load=lambda limit, offset: EvidenceService().list(limit=limit, offset=offset),
+        fields=fields, editable_fields=editable, summary=summary,
+        save=lambda rid, ch: EvidenceService().update(rid, **ch),
+        delete=lambda rid: EvidenceService().delete(rid, remove_file=True),
+    ))
 
 
 # --- Views ---------------------------------------------------------------
@@ -517,5 +435,6 @@ def about_flow() -> None:
     from app import __version__
     console.print(f"\nOpsCollector-CLI v{__version__}")
     console.print("Capture Once. Report Everywhere.")
-    console.print("Keyboard menu: Up/Down navigate, Left/Right column, Enter select, Esc back.\n")
+    console.print("Keyboard menu: ↑↓ select, ←→ column, Enter open, Esc back/exit.")
+    console.print("Shortcuts: F1 Help · F2 Save · F3 New · F4 Edit · F8 Delete · F9 Refresh.")
     _pause()

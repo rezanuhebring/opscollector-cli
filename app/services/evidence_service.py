@@ -129,6 +129,28 @@ class EvidenceService:
         data = self.get(evidence_id)
         return get_settings().evidence_dir / data["relative_path"]
 
+    def update(self, evidence_id: int, **fields: Any) -> dict[str, Any]:
+        """Patch mutable metadata on an evidence record (title/description/category/link)."""
+        allowed = {
+            "title",
+            "description",
+            "evidence_category_id",
+            "entity_type",
+            "entity_id",
+            "uploaded_by",
+        }
+        clean = {k: v for k, v in fields.items() if k in allowed}
+        with get_session() as session:
+            obj = session.get(Evidence, evidence_id)
+            if obj is None:
+                raise ValidationError(f"Evidence id={evidence_id} not found")
+            if clean:
+                for key, value in clean.items():
+                    setattr(obj, key, value)
+                session.commit()
+                session.refresh(obj)
+            return _to_dict(obj)
+
     def delete(self, evidence_id: int, *, remove_file: bool = True) -> None:
         with get_session() as session:
             obj = session.get(Evidence, evidence_id)

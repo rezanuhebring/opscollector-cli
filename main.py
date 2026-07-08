@@ -32,27 +32,18 @@ from app.cli.menu_actions import (
     about_flow,
     backup_flow,
     bau_add_flow,
-    bau_delete_flow,
-    bau_edit_flow,
     bau_list_flow,
     change_add_flow,
-    change_delete_flow,
-    change_edit_flow,
     change_list_flow,
     dashboard_flow,
     evidence_add_flow,
-    evidence_delete_flow,
     evidence_list_flow,
     excel_export_flow,
     excel_import_flow,
     incident_add_flow,
-    incident_delete_flow,
-    incident_edit_flow,
     incident_list_flow,
     load_demo_flow,
     master_add_flow,
-    master_delete_flow,
-    master_edit_flow,
     master_list_flow,
     search_flow,
 )
@@ -115,34 +106,25 @@ def _build_menu() -> list[interactive.MenuItem]:
         return interactive.MenuItem(label, desc, submenu=items)
 
     return [
-        sub("Incident", "Incidents: list / create / edit / delete", [
-            interactive.MenuItem("List", "View logged incidents", incident_list_flow),
+        sub("Incident", "Incidents: browse / create (F4 edit, F8 delete inside)", [
+            interactive.MenuItem("List", "Browse & edit incidents (F4 edit, F8 delete)", incident_list_flow),
             interactive.MenuItem("Create", "Log a new incident", incident_add_flow),
-            interactive.MenuItem("Edit", "Update an incident", incident_edit_flow),
-            interactive.MenuItem("Delete", "Remove an incident", incident_delete_flow),
         ]),
-        sub("Daily BAU", "BAU: list / create / edit / delete", [
-            interactive.MenuItem("List", "View BAU records", bau_list_flow),
+        sub("Daily BAU", "BAU: browse / create (F4 edit, F8 delete inside)", [
+            interactive.MenuItem("List", "Browse & edit BAU (F4 edit, F8 delete)", bau_list_flow),
             interactive.MenuItem("Create", "Log daily business-as-usual", bau_add_flow),
-            interactive.MenuItem("Edit", "Update a BAU record", bau_edit_flow),
-            interactive.MenuItem("Delete", "Remove a BAU record", bau_delete_flow),
         ]),
-        sub("Change / Maint.", "Changes: list / create / edit / delete", [
-            interactive.MenuItem("List", "View change records", change_list_flow),
+        sub("Change / Maint.", "Changes: browse / create (F4 edit, F8 delete inside)", [
+            interactive.MenuItem("List", "Browse & edit changes (F4 edit, F8 delete)", change_list_flow),
             interactive.MenuItem("Create", "Log a change or maintenance", change_add_flow),
-            interactive.MenuItem("Edit", "Update a change record", change_edit_flow),
-            interactive.MenuItem("Delete", "Remove a change record", change_delete_flow),
         ]),
-        sub("Evidence", "Evidence: list / add / delete", [
-            interactive.MenuItem("List", "View evidence register", evidence_list_flow),
+        sub("Evidence", "Evidence: browse / add (F4 edit, F8 delete inside)", [
+            interactive.MenuItem("List", "Browse evidence (F4 edit, F8 delete)", evidence_list_flow),
             interactive.MenuItem("Add", "Add a file to the evidence repo", evidence_add_flow),
-            interactive.MenuItem("Delete", "Remove evidence (and file)", evidence_delete_flow),
         ]),
-        sub("Master Data", "Reference data: list / create / edit / delete", [
-            interactive.MenuItem("List", "View master records", master_list_flow),
+        sub("Master Data", "Reference data: browse / create (F4 edit, F8 delete inside)", [
+            interactive.MenuItem("List", "Browse & edit master records", master_list_flow),
             interactive.MenuItem("Create", "Add a master record", master_add_flow),
-            interactive.MenuItem("Edit", "Update a master record", master_edit_flow),
-            interactive.MenuItem("Delete", "Remove a master record", master_delete_flow),
         ]),
         interactive.MenuItem("Dashboard", "View operational summary", dashboard_flow),
         interactive.MenuItem("Import Excel/CSV", "Bulk import from a file", excel_import_flow),

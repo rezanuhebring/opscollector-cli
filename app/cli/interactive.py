@@ -22,7 +22,7 @@ from __future__ import annotations
 import msvcrt
 import sys
 from dataclasses import dataclass, field
-from typing import Callable
+from typing import Callable, Sequence
 
 # Canonical key tokens returned by _read_key().
 UP = "UP"
@@ -32,11 +32,35 @@ RIGHT = "RIGHT"
 ENTER = "ENTER"
 ESC = "ESC"
 CTRL_C = "CTRL_C"
+# Function keys F1..F12
+F1 = "F1"
+F2 = "F2"
+F3 = "F3"
+F4 = "F4"
+F5 = "F5"
+F6 = "F6"
+F7 = "F7"
+F8 = "F8"
+F9 = "F9"
+F10 = "F10"
+F11 = "F11"
+F12 = "F12"
 
 # Legacy console scan codes (after the 0x00 / 0xe0 prefix).
 _LEGACY = {"H": UP, "P": DOWN, "K": LEFT, "M": RIGHT}
 # VT sequences (after the ESC [ prefix).
 _VT = {"A": UP, "B": DOWN, "C": RIGHT, "D": LEFT}
+
+# Legacy conhost scan codes for the function keys (after 0x00/0xe0).
+_LEGACY_F = {
+    "\x3b": F1, "\x3c": F2, "\x3d": F3, "\x3e": F4, "\x3f": F5, "\x40": F6,
+    "\x41": F7, "\x42": F8, "\x43": F9, "\x44": F10, "\x85": F11, "\x86": F12,
+}
+# SS3 sequences (after the ESC O prefix): F1..F4.
+_SS3_F = {"P": F1, "Q": F2, "R": F3, "S": F4}
+# CSI sequences (after the ESC [ prefix) for F5..F12: "<n>~".
+_CSI_F = {"15": F5, "17": F6, "18": F7, "19": F8, "20": F9, "21": F10,
+          "23": F11, "24": F12}
 
 
 @dataclass
@@ -66,14 +90,30 @@ def _read_key() -> str:
     # Legacy extended key: 0x00 or 0xe0 prefix followed by a scan code.
     if ch in ("\x00", "\xe0"):
         code = msvcrt.getwch()
+        if code in _LEGACY_F:
+            return _LEGACY_F[code]
         return _LEGACY.get(code, ch + code)
-    # VT / ANSI sequence (Windows Terminal, ConPTY): ESC [ <letter>
+    # VT / ANSI sequence (Windows Terminal, ConPTY): ESC O <code> or ESC [ ...
     if ch == "\x1b":
         nxt = msvcrt.getwch()
+        if nxt == "O":  # SS3: function keys F1..F4
+            code = msvcrt.getwch()
+            return _SS3_F.get(code, ESC)
         if nxt == "[":
             code = msvcrt.getwch()
-            return _VT.get(code, ESC)
-        # A lone ESC (not the start of a CSI sequence) -> treat as Esc.
+            if code in _VT:
+                return _VT[code]
+            # Collect the numeric prefix of a CSI sequence (e.g. "15~").
+            digits = code if code.isdigit() else ""
+            while True:
+                after = msvcrt.getwch()
+                if after == "~":
+                    return _CSI_F.get(digits, ESC)
+                if after.isdigit():
+                    digits += after
+                else:
+                    return ESC
+        # Any other ESC sequence (e.g. lone ESC followed by another char).
         return ESC
     if ch == "\r":
         return ENTER
@@ -108,7 +148,7 @@ def _render(title: str, items: list[MenuItem], selected: int) -> None:
                 cell = lp.ljust(27) + " " + rp.ljust(27)
             print(f"{_SIDE}{cell.ljust(56)}{_SIDE}")
     print(_BOT)
-    hint = "  \u2191\u2193 navigate   \u2190\u2192 column   Enter select   Esc back/exit"
+    hint = "  ↑↓ navigate   ←→ column   Enter open   F1 help   Esc back/exit"
     print(f"{hint}")
 
 
@@ -125,6 +165,9 @@ def _navigate(title: str, items: list[MenuItem], *, top_items: list[MenuItem]) -
         key = _read_key()
         if key == ESC:
             return  # back to parent (or exit at root)
+        if key == F1:
+            _show_help_overlay(GLOBAL_SHORTCUTS)
+            continue
         if key == ENTER:
             item = items[selected]
             if item.submenu:
@@ -165,5 +208,45 @@ def _pause() -> None:
             msvcrt.getwch()
     except Exception:
         pass
+
+
+# Standard function-key shortcuts, reusable across every module.
+GLOBAL_SHORTCUTS: list[tuple[str, str]] = [
+    ("F1", "Help"),
+    ("F2", "Save"),
+    ("F3", "New / Add"),
+    ("F4", "Edit"),
+    ("F8", "Delete"),
+    ("F9", "Refresh"),
+    ("Enter", "Open / Select"),
+    ("Esc", "Back / Cancel / Exit"),
+]
+
+# Box used by the help overlay.
+_HTOP = "\u2554" + "\u2550" * 56 + "\u2557"
+_HBOT = "\u255a" + "\u2550" * 56 + "\u255d"
+
+
+def _show_help_overlay(shortcuts: Sequence[tuple[str, str]] = GLOBAL_SHORTCUTS) -> None:
+    """Render a full-screen keyboard-shortcut help overlay. Any key closes it."""
+    if sys.stdout.isatty():
+        sys.stdout.write("\x1b[2J\x1b[H")
+    print(_HTOP)
+    print(f"{_SIDE}  Keyboard Shortcuts{'':<42}{_SIDE}")
+    print(_SIDE + "\u2550" * 56 + _SIDE)
+    for key, desc in shortcuts:
+        print(f"{_SIDE}  {key.ljust(8)}{desc.ljust(45)}{_SIDE}")
+    print(_HBOT)
+    print("  Press any key to close...")
+    sys.stdout.flush()
+    try:
+        ch = msvcrt.getwch()
+        if ch in ("\x00", "\xe0"):
+            msvcrt.getwch()
+        elif ch == "\x1b" and msvcrt.kbhit() and msvcrt.getwch() == "[":
+            msvcrt.getwch()
+    except Exception:
+        pass
+
 
 
