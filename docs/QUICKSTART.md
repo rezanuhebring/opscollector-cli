@@ -13,9 +13,22 @@ initialises the SQLite database with seeded statuses/priorities.
 
 ## 2. Run
 
+Launch the interactive **keyboard menu** (default):
+
 ```powershell
 opscollector          # or
 .\opscollector.cmd
+```
+
+Controls: **↑/↓** navigate, **←/→** move between columns, **Enter** select,
+**Esc** go back / exit. The menu wraps the same service layer as the CLI, so
+all data lands in the same SQLite database.
+
+Prefer typed commands? Use `--cli` (or set `OPSC_KEYBOARD=0`):
+
+```powershell
+opscollector --cli
+python main.py --cli bau add --date 2026-07-08 --title "Server patch"
 ```
 
 ## 3. Common commands

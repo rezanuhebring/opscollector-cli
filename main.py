@@ -7,6 +7,8 @@ CLI parsing and startup.
 
 from __future__ import annotations
 
+import os
+
 import typer
 from rich.console import Console
 
@@ -24,6 +26,7 @@ from app.cli import (
     search_cmd,
     watch_cmd,
 )
+from app.cli import interactive, menu_actions
 from app.core.logging_config import get_logger
 
 console = Console()
@@ -66,12 +69,41 @@ def _version_callback(value: bool) -> None:
         raise typer.Exit()
 
 
+def _build_menu() -> list[interactive.MenuItem]:
+    """Top-level keyboard-menu items, mapped to service-backed flows."""
+    return [
+        interactive.MenuItem("Daily BAU", "Log daily business-as-usual", menu_actions.bau_add_flow),
+        interactive.MenuItem("Incident", "Log an operational incident", menu_actions.incident_add_flow),
+        interactive.MenuItem("Change / Maint.", "Log a change or maintenance", menu_actions.change_add_flow),
+        interactive.MenuItem("Evidence", "Add a file to the evidence repo", menu_actions.evidence_add_flow),
+        interactive.MenuItem("Master Data", "Add/list reference data", menu_actions.master_add_flow),
+        interactive.MenuItem("Dashboard", "View operational summary", menu_actions.dashboard_flow),
+        interactive.MenuItem("Search", "Search operational data", menu_actions.search_flow),
+        interactive.MenuItem("Excel Export", "Export a report to Excel", menu_actions.excel_export_flow),
+        interactive.MenuItem("Backup", "Create a timestamped backup", menu_actions.backup_flow),
+        interactive.MenuItem("About", "Version and help", menu_actions.about_flow),
+    ]
+
+
 @app.callback()
 def main(
     version: bool = typer.Option(False, "--version", callback=_version_callback, is_eager=True),
+    cli: bool = typer.Option(False, "--cli", help="Use the typed command-line interface instead of the keyboard menu"),
 ) -> None:
-    """OpsCollector-CLI main entry point."""
+    """OpsCollector-CLI main entry point.
+
+    By default opens an interactive keyboard-driven menu (Up/Down/Left/Right,
+    Enter to select, Esc to go back). Use ``--cli`` for the classic typed
+    commands, or set ``OPSC_KEYBOARD=0`` to disable the menu by default.
+    """
     _ensure_db()
+    if cli or os.environ.get("OPSC_KEYBOARD", "1") == "0":
+        return  # fall through to Typer command dispatch
+    try:
+        interactive.run_menu("OpsCollector-CLI — Capture Once. Report Everywhere.", _build_menu())
+    except KeyboardInterrupt:
+        console.print("\n[dim]Exited.[/dim]")
+    raise typer.Exit()
 
 
 if __name__ == "__main__":
