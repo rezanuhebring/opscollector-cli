@@ -28,6 +28,24 @@ from app.cli import (
     watch_cmd,
 )
 from app.cli import interactive, menu_actions
+from app.cli.menu_actions import (
+    about_flow,
+    backup_flow,
+    bau_add_flow,
+    bau_list_flow,
+    change_add_flow,
+    change_list_flow,
+    dashboard_flow,
+    evidence_add_flow,
+    evidence_list_flow,
+    excel_export_flow,
+    excel_import_flow,
+    incident_add_flow,
+    incident_list_flow,
+    load_demo_flow,
+    master_add_flow,
+    search_flow,
+)
 from app.core.logging_config import get_logger
 
 console = Console()
