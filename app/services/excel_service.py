@@ -113,7 +113,10 @@ class ExcelService:
 
     # --- Preview (no persistence) ---
     def preview(self, file_path: str | Path, sheet: str | None = None) -> list[dict[str, Any]]:
-        wb = load_workbook(file_path, read_only=True, data_only=True)
+        p = Path(file_path)
+        if p.suffix.lower() == ".csv":
+            return _read_csv(p)
+        wb = load_workbook(p, read_only=True, data_only=True)
         ws = wb[sheet] if sheet else wb.active
         rows = list(ws.iter_rows(values_only=True))
         if not rows:
@@ -336,6 +339,15 @@ class ExcelService:
 # ---------------------------------------------------------------------------
 # internal helpers
 # ---------------------------------------------------------------------------
+
+def _read_csv(path: Path) -> list[dict[str, Any]]:
+    """Read a CSV file into a list of dict rows (header = keys)."""
+    import csv
+
+    with path.open(newline="", encoding="utf-8-sig") as fh:
+        reader = csv.DictReader(fh)
+        return [dict(row) for row in reader]
+
 
 def _as_int(v: Any) -> int | None:
     if v is None or v == "":

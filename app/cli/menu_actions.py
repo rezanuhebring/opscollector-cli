@@ -121,6 +121,15 @@ def bau_add_flow() -> None:
         console.print(f"[red]! {exc}[/red]")
 
 
+def bau_list_flow() -> None:
+    rows = BAUService().list(limit=25)
+    if not rows:
+        console.print("[dim](no BAU records)[/dim]")
+        return
+    for r in rows:
+        console.print(f"  [{r['id']}] {r['date']} — {r['title']} [{r.get('status_id')}]")
+
+
 def incident_add_flow() -> None:
     date_ = _ask_date("Date")
     title = _ask("Title")
@@ -134,6 +143,15 @@ def incident_add_flow() -> None:
         console.print(f"[green]✓ Incident logged ({rec['incident_no']})[/green]")
     except Exception as exc:
         console.print(f"[red]! {exc}[/red]")
+
+
+def incident_list_flow() -> None:
+    rows = IncidentService().list(limit=25)
+    if not rows:
+        console.print("[dim](no incidents)[/dim]")
+        return
+    for r in rows:
+        console.print(f"  [{r['id']}] {r['date']} — {r['title']} ({r['severity']})")
 
 
 def change_add_flow() -> None:
@@ -151,6 +169,15 @@ def change_add_flow() -> None:
         console.print(f"[red]! {exc}[/red]")
 
 
+def change_list_flow() -> None:
+    rows = ChangeService().list(limit=25)
+    if not rows:
+        console.print("[dim](no changes)[/dim]")
+        return
+    for r in rows:
+        console.print(f"  [{r['id']}] {r['date']} — {r['title']} ({r.get('change_type')})")
+
+
 def evidence_add_flow() -> None:
     path = _ask("Source file path")
     if not path or not os.path.exists(path):
@@ -163,6 +190,15 @@ def evidence_add_flow() -> None:
         console.print(f"[green]✓ Evidence stored ({rec['relative_path']})[/green]")
     except Exception as exc:
         console.print(f"[red]! {exc}[/red]")
+
+
+def evidence_list_flow() -> None:
+    rows = EvidenceService().list(limit=25)
+    if not rows:
+        console.print("[dim](no evidence)[/dim]")
+        return
+    for r in rows:
+        console.print(f"  [{r['id']}] {r.get('title') or r['original_filename']} ({r['extension']})")
 
 
 # --- Views ---------------------------------------------------------------
@@ -187,6 +223,38 @@ def search_flow() -> None:
         console.print(f"\n[bold]{etype.upper()}[/bold] ({len(rows)})")
         for r in rows[:10]:
             console.print(f"  [{r.get('id')}] {r.get('title') or r.get('date')}")
+
+
+def load_demo_flow() -> None:
+    from app.database.seed import force_seed_demo_data, seed_reference_data
+
+    try:
+        seed_reference_data()
+        added = force_seed_demo_data()
+        console.print(f"[green]✓ Demo data loaded ({added} incidents inserted)[/green]")
+    except Exception as exc:
+        console.print(f"[red]! {exc}[/red]")
+
+
+def excel_import_flow() -> None:
+    console.print("Entities: daily_bau, okr_progress, incident, change, <master type e.g. department>")
+    file_path = _ask("Excel/CSV file path")
+    if not file_path or not os.path.exists(file_path):
+        console.print("[yellow]! file not found[/yellow]")
+        return
+    entity = _ask("Entity")
+    if not entity:
+        return
+    try:
+        res = ExcelService().import_sheet(file_path, entity)
+        console.print(
+            f"[green]✓ Imported {res['created']} of {res['rows_read']} rows "
+            f"({len(res['errors'])} errors)[/green]"
+        )
+        for err in res["errors"][:10]:
+            console.print(f"  [red]row {err['row']}: {err['error']}[/red]")
+    except Exception as exc:
+        console.print(f"[red]! {exc}[/red]")
 
 
 def excel_export_flow() -> None:

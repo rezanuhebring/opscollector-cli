@@ -18,6 +18,7 @@ from app.cli import (
     bau_cmd,
     change_cmd,
     dashboard_cmd,
+    db_cmd,
     evidence_cmd,
     excel_cmd,
     incident_cmd,
@@ -34,11 +35,14 @@ logger = get_logger("cli")
 
 
 def _ensure_db() -> None:
-    """Create the database and seed reference data if needed."""
+    """Create the database and seed reference + demo data if needed."""
     from app.database.db import init_db
+    from app.database.seed import seed_demo_data, seed_reference_data
 
     try:
         init_db()
+        seed_reference_data()
+        seed_demo_data()
     except Exception as exc:  # pragma: no cover - defensive
         console.print(f"[red]Failed to initialise database:[/red] {exc}")
         raise typer.Exit(code=1)
@@ -62,6 +66,7 @@ app.add_typer(evidence_cmd.app, name="evidence")
 app.add_typer(search_cmd.app, name="search")
 app.add_typer(dashboard_cmd.app, name="dashboard")
 app.add_typer(excel_cmd.app, name="excel")
+app.add_typer(db_cmd.app, name="db")
 app.add_typer(backup_cmd.app, name="backup")
 app.add_typer(watch_cmd.app, name="watch")
 
@@ -75,16 +80,22 @@ def _version_callback(value: bool) -> None:
 def _build_menu() -> list[interactive.MenuItem]:
     """Top-level keyboard-menu items, mapped to service-backed flows."""
     return [
-        interactive.MenuItem("Daily BAU", "Log daily business-as-usual", menu_actions.bau_add_flow),
-        interactive.MenuItem("Incident", "Log an operational incident", menu_actions.incident_add_flow),
-        interactive.MenuItem("Change / Maint.", "Log a change or maintenance", menu_actions.change_add_flow),
-        interactive.MenuItem("Evidence", "Add a file to the evidence repo", menu_actions.evidence_add_flow),
-        interactive.MenuItem("Master Data", "Add/list reference data", menu_actions.master_add_flow),
-        interactive.MenuItem("Dashboard", "View operational summary", menu_actions.dashboard_flow),
-        interactive.MenuItem("Search", "Search operational data", menu_actions.search_flow),
-        interactive.MenuItem("Excel Export", "Export a report to Excel", menu_actions.excel_export_flow),
-        interactive.MenuItem("Backup", "Create a timestamped backup", menu_actions.backup_flow),
-        interactive.MenuItem("About", "Version and help", menu_actions.about_flow),
+        interactive.MenuItem("Daily BAU", "Log daily business-as-usual", bau_add_flow),
+        interactive.MenuItem("Incident", "Log an operational incident", incident_add_flow),
+        interactive.MenuItem("Change / Maint.", "Log a change or maintenance", change_add_flow),
+        interactive.MenuItem("Evidence", "Add a file to the evidence repo", evidence_add_flow),
+        interactive.MenuItem("Master Data", "Add/list reference data", master_add_flow),
+        interactive.MenuItem("List Incidents", "View logged incidents", incident_list_flow),
+        interactive.MenuItem("List BAU", "View BAU records", bau_list_flow),
+        interactive.MenuItem("List Changes", "View change records", change_list_flow),
+        interactive.MenuItem("List Evidence", "View evidence register", evidence_list_flow),
+        interactive.MenuItem("Import Excel/CSV", "Bulk import from a file", excel_import_flow),
+        interactive.MenuItem("Load Demo Data", "Populate example data", load_demo_flow),
+        interactive.MenuItem("Dashboard", "View operational summary", dashboard_flow),
+        interactive.MenuItem("Search", "Search operational data", search_flow),
+        interactive.MenuItem("Excel Export", "Export a report to Excel", excel_export_flow),
+        interactive.MenuItem("Backup", "Create a timestamped backup", backup_flow),
+        interactive.MenuItem("About", "Version and help", about_flow),
     ]
 
 

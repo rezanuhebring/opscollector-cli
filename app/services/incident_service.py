@@ -16,11 +16,14 @@ class IncidentService:
     """Business operations for Incident records."""
 
     def _next_incident_no(self, session: Any) -> str:
+        from sqlalchemy import func
+
         year = __import__("datetime").datetime.now().year
-        count = session.scalar(
-            select(Incident).where(Incident.incident_no.like(f"INC-{year}-%"))
-        )
-        seq = (session.query(Incident).count() or 0) + 1
+        # Count existing incidents for this year to derive the next sequence.
+        existing = session.scalar(
+            select(func.count()).select_from(Incident).where(Incident.incident_no.like(f"INC-{year}-%"))
+        ) or 0
+        seq = existing + 1
         return f"INC-{year}-{seq:04d}"
 
     def create(

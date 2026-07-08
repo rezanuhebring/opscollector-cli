@@ -44,17 +44,24 @@ class DashboardService:
             incidents_open = session.scalar(
                 select(func.count()).select_from(Incident).join(Status, Incident.status_id == Status.id).where(Status.name.in_(["Open", "In Progress"]))
             ) or 0
+            incidents_resolved = session.scalar(
+                select(func.count()).select_from(Incident).join(Status, Incident.status_id == Status.id).where(Status.name.in_(["Resolved", "Closed"]))
+            ) or 0
 
             changes_total = session.scalar(select(func.count()).select_from(ChangeLog)) or 0
             evidence_total = session.scalar(select(func.count()).select_from(Evidence)) or 0
+
+            # Average KR progress across all objectives.
+            kr_rows = session.scalars(select(KeyResult.progress)).all()
+            kr_avg = round(sum(kr_rows) / len(kr_rows), 1) if kr_rows else 0.0
 
             bau_completion = round((bau_done / bau_total * 100), 1) if bau_total else 0.0
 
             return {
                 "objectives": {"total": objectives_total, "completed": objectives_done},
-                "key_results": {"total": krs_total},
+                "key_results": {"total": krs_total, "avg_progress": kr_avg},
                 "bau": {"total": bau_total, "completed": bau_done, "completion_pct": bau_completion},
-                "incidents": {"total": incidents_total, "open": incidents_open},
+                "incidents": {"total": incidents_total, "open": incidents_open, "resolved": incidents_resolved},
                 "changes": {"total": changes_total},
                 "evidence": {"total": evidence_total},
                 "outstanding": bau_total - bau_done,

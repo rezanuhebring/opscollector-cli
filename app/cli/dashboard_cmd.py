@@ -17,18 +17,27 @@ svc = DashboardService()
 def show() -> None:
     """Show the operational summary dashboard."""
     s = svc.summary()
-    panel = Panel.fit(
-        f"[bold]Objectives[/bold]: {s['objectives']['completed']}/{s['objectives']['total']} completed\n"
-        f"[bold]Key Results[/bold]: {s['key_results']['total']}\n"
-        f"[bold]BAU[/bold]: {s['bau']['completed']}/{s['bau']['total']} ({s['bau']['completion_pct']}%)\n"
-        f"[bold]Incidents[/bold]: {s['incidents']['total']} ({s['incidents']['open']} open)\n"
-        f"[bold]Changes[/bold]: {s['changes']['total']}\n"
-        f"[bold]Evidence[/bold]: {s['evidence']['total']}\n"
-        f"[bold]Outstanding[/bold]: {s['outstanding']}",
-        title="OpsCollector Dashboard",
-        border_style="magenta",
-    )
+    lines = [
+        f"[bold cyan]Progress Objective[/bold cyan]: {s['objectives']['completed']}/{s['objectives']['total']} completed",
+        f"[bold cyan]Progress KR[/bold cyan]: {s['key_results']['total']} (avg {s['key_results']['avg_progress']}%)",
+        f"[bold cyan]BAU Completion[/bold cyan]: {s['bau']['completed']}/{s['bau']['total']} ({s['bau']['completion_pct']}%)",
+        f"[bold cyan]Incident Summary[/bold cyan]: {s['incidents']['total']} total, {s['incidents']['open']} open, {s['incidents']['resolved']} resolved",
+        f"[bold cyan]Outstanding Activity[/bold cyan]: {s['outstanding']}",
+        f"[bold cyan]Evidence Count[/bold cyan]: {s['evidence']['total']}",
+    ]
+    panel = Panel.fit("\n".join(lines), title="OpsCollector Dashboard", border_style="magenta")
     console.print(panel)
+
+    # Weekly trend as a table.
+    trend = svc.weekly_trend(weeks=4)
+    table = Table(title="Weekly Trend")
+    table.add_column("Week")
+    table.add_column("BAU")
+    table.add_column("Incidents")
+    table.add_column("Changes")
+    for w in trend:
+        table.add_row(w["week"], str(w["bau"]), str(w["incidents"]), str(w["changes"]))
+    console.print(table)
 
 
 @app.command("weekly")
