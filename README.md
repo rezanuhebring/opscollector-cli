@@ -45,7 +45,7 @@ The architecture separates CLI presentation from business logic and repositories
 ## Directory Structure
 
 ```
-D:\My Works\opscollector-cli\
+opscollector-cli\
 ├── app/
 │   ├── cli/            # Typer command modules
 │   │   ├── master_cmd.py
