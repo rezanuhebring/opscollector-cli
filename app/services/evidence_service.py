@@ -102,6 +102,7 @@ class EvidenceService:
         entity_id: int | None = None,
         evidence_category_id: int | None = None,
         limit: int | None = 50,
+        offset: int = 0,
     ) -> list[dict[str, Any]]:
         with get_session() as session:
             stmt = select(Evidence)
@@ -112,6 +113,7 @@ class EvidenceService:
             if evidence_category_id is not None:
                 stmt = stmt.where(Evidence.evidence_category_id == evidence_category_id)
             stmt = stmt.order_by(Evidence.uploaded_at.desc())
+            stmt = stmt.offset(offset)
             if limit:
                 stmt = stmt.limit(limit)
             rows = session.scalars(stmt).all()

@@ -54,6 +54,7 @@ class BAUService:
         status_id: int | None = None,
         pic_id: int | None = None,
         limit: int | None = 50,
+        offset: int = 0,
     ) -> list[dict[str, Any]]:
         with get_session() as session:
             stmt = select(DailyBAU)
@@ -66,6 +67,7 @@ class BAUService:
             if pic_id is not None:
                 stmt = stmt.where(DailyBAU.pic_id == pic_id)
             stmt = stmt.order_by(DailyBAU.date.desc())
+            stmt = stmt.offset(offset)
             if limit:
                 stmt = stmt.limit(limit)
             rows = session.scalars(stmt).all()

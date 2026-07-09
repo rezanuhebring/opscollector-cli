@@ -64,12 +64,20 @@ class MasterService:
     def list_types(self) -> list[str]:
         return sorted(MASTER_MODELS.keys())
 
-    def list(self, entity: str, *, active_only: bool = False) -> list[dict[str, Any]]:
+    def list(
+        self,
+        entity: str,
+        *,
+        active_only: bool = False,
+        limit: int = 50,
+        offset: int = 0,
+    ) -> list[dict[str, Any]]:
         model = self._resolve(entity)
         with get_session() as session:
             stmt = select(model)
             if active_only:
                 stmt = stmt.where(model.is_active == True)  # noqa: E712
+            stmt = stmt.limit(limit).offset(offset)
             rows = session.scalars(stmt).all()
             return [_to_dict(r) for r in rows]
 

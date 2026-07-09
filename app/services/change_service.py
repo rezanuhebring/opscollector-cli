@@ -66,6 +66,7 @@ class ChangeService:
         change_type: str | None = None,
         status_id: int | None = None,
         limit: int | None = 50,
+        offset: int = 0,
     ) -> list[dict[str, Any]]:
         with get_session() as session:
             stmt = select(ChangeLog)
@@ -78,6 +79,7 @@ class ChangeService:
             if status_id is not None:
                 stmt = stmt.where(ChangeLog.status_id == status_id)
             stmt = stmt.order_by(ChangeLog.date.desc())
+            stmt = stmt.offset(offset)
             if limit:
                 stmt = stmt.limit(limit)
             rows = session.scalars(stmt).all()
