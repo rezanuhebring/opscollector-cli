@@ -8,6 +8,10 @@ venv/
 # App data (keep structure, ignore contents)
 database/*.db
 database/*.db-journal
+server_sync.db
+server/*.db
+server/*.db-journal
+testsTemp/
 evidence/**
 export/**
 backup/**
