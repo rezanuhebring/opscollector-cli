@@ -36,6 +36,8 @@ from app.cli.menu_actions import (
     change_add_flow,
     change_list_flow,
     dashboard_flow,
+    department_add_flow,
+    department_list_flow,
     evidence_add_flow,
     evidence_list_flow,
     excel_export_flow,
@@ -45,6 +47,8 @@ from app.cli.menu_actions import (
     load_demo_flow,
     master_add_flow,
     master_list_flow,
+    personnel_add_flow,
+    personnel_list_flow,
     search_flow,
 )
 from app.core.logging_config import get_logger
@@ -125,6 +129,12 @@ def _build_menu() -> list[interactive.MenuItem]:
         sub("Master Data", "Reference data: browse / create (F4 edit, F8 delete inside)", [
             interactive.MenuItem("List", "Browse & edit master records", master_list_flow),
             interactive.MenuItem("Create", "Add a master record", master_add_flow),
+        ]),
+        sub("Personnel", "People & departments", [
+            interactive.MenuItem("List People", "Browse personnel", personnel_list_flow),
+            interactive.MenuItem("Add Person", "Create personnel", personnel_add_flow),
+            interactive.MenuItem("List Departments", "Browse departments", department_list_flow),
+            interactive.MenuItem("Add Department", "Create department", department_add_flow),
         ]),
         interactive.MenuItem("Dashboard", "View operational summary", dashboard_flow),
         interactive.MenuItem("Import Excel/CSV", "Bulk import from a file", excel_import_flow),

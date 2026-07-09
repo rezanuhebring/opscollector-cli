@@ -60,6 +60,12 @@ class TestBAUService:
         by_status = bau_svc.list(status_id=1, limit=50)
         assert len(by_status) == 3
 
+    def test_delete_existing(self, bau_svc):
+        created = bau_svc.create(date="2026-07-10", title="delme")
+        bau_svc.delete(created["id"])
+        with pytest.raises(ValidationError):
+            bau_svc.get(created["id"])
+
     def test_update_title(self, bau_svc):
         created = bau_svc.create(date="2026-07-08", title="old")
         updated = bau_svc.update(created["id"], title="new")

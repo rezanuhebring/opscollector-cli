@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import msvcrt
 import os
+import sys
 from datetime import date
 
 from rich.console import Console
@@ -92,6 +93,55 @@ def _ask_date(prompt: str) -> str:
     return raw or default
 
 
+# --- Reference helpers ----------------------------------------------------------
+def _ref_list(entity: str) -> list[dict]:
+    return MasterService().list(entity, active_only=True)
+
+
+def _ref_name(entity: str, id_: int | None) -> str:
+    if id_ is None:
+        return ""
+    try:
+        return MasterService().get(entity, int(id_)).get("name") or ""
+    except Exception:
+        return ""
+
+
+def _select_reference(entity: str, prompt: str) -> int | None:
+    from app.cli.interactive import _read_key, DOWN, ENTER, ESC, UP
+
+    items = _ref_list(entity)
+    if not items:
+        console.print(f"[yellow]! no active {entity} records[/yellow]")
+        return None
+
+    selected = 0
+    while True:
+        if sys.stdout.isatty():
+            sys.stdout.write("\x1b[2J\x1b[H")
+        print("\u2554" + "\u2550" * 72 + "\u2557")
+        print(f"\u2551  {prompt} (active {entity.title()}){'':<46}\u2551")
+        print("\u2551" + "\u2550" * 72 + "\u2551")
+        for i, row in enumerate(items):
+            ptr = "\u25b6" if i == selected else " "
+            print(f"\u2551 {ptr} {str(i+1):>3}. {row.get('name') or str(row.get('id'))[:48]:<48}\u2551")
+        print("\u255a" + "\u2550" * 72 + "\u255d")
+        print("  ↑↓/jk move   Enter choose   Esc cancel")
+        console.print()
+
+        key = _read_key()
+        if key == ESC:
+            return None
+        if key == DOWN or key.lower() == "j":
+            selected = (selected + 1) % len(items)
+            continue
+        if key == UP or key.lower() == "k":
+            selected = (selected - 1) % len(items)
+            continue
+        if key == ENTER:
+            return items[selected].get("id")
+
+
 def _pause() -> None:
     console.print("\n[dim]Press Enter to continue...[/dim]")
     try:
@@ -161,7 +211,7 @@ def bau_add_flow() -> None:
         console.print("[yellow]! title required[/yellow]")
         return
     desc = _ask("Description")
-    status_id = _ask_int("Status ID", default=0)
+    status_id = _select_reference("status", "Status")
     try:
         rec = BAUService().create(
             date=date_, title=title, description=desc or None,
@@ -183,25 +233,25 @@ def bau_list_flow() -> None:
             ("Date", r["date"]),
             ("Title", r["title"]),
             ("Description", r.get("description") or ""),
-            ("Status ID", r.get("status_id")),
-            ("PIC ID", r.get("pic_id")),
-            ("Dept ID", r.get("department_id")),
+            ("Status", _ref_name("status", r.get("status_id"))),
+            ("PIC", _ref_name("pic", r.get("pic_id"))),
+            ("Department", _ref_name("department", r.get("department_id"))),
         ]
 
     def editable(r):
         return [
             ("title", "Title", r["title"]),
             ("description", "Description", r.get("description") or ""),
-            ("status_id", "Status ID", r.get("status_id") or ""),
-            ("pic_id", "PIC ID", r.get("pic_id") or ""),
-            ("department_id", "Dept ID", r.get("department_id") or ""),
+            ("status_id", "Status", r.get("status_id"), "status"),
+            ("pic_id", "PIC", r.get("pic_id"), "pic"),
+            ("department_id", "Department", r.get("department_id"), "department"),
         ]
 
     browse(BrowserSpec(
         title="Daily BAU",
         load=lambda limit, offset: BAUService().list(limit=limit, offset=offset),
         fields=fields, editable_fields=editable, summary=summary,
-        save=lambda rid, ch: BAUService().update(rid, **{k: (int(v) if v.isdigit() else v) for k, v in ch.items()}),
+        save=lambda rid, ch: BAUService().update(rid, **{k: (int(v) if isinstance(v, str) and v.isdigit() else v) for k, v in ch.items()}),
         delete=lambda rid: BAUService().delete(rid),
     ))
 
@@ -214,8 +264,12 @@ def incident_add_flow() -> None:
         return
     severity = _ask("Severity", default="Medium")
     desc = _ask("Description")
+    status_id = _select_reference("status", "Status")
     try:
-        rec = IncidentService().create(date=date_, title=title, severity=severity, description=desc or None)
+        rec = IncidentService().create(
+            date=date_, title=title, severity=severity,
+            description=desc or None, status_id=status_id
+        )
         console.print(f"[green]✓ Incident logged ({rec['incident_no']})[/green]")
     except Exception as exc:
         console.print(f"[red]! {exc}[/red]")
@@ -233,9 +287,9 @@ def incident_list_flow() -> None:
             ("Date", r["date"]),
             ("Title", r["title"]),
             ("Severity", r["severity"]),
-            ("Status ID", r.get("status_id")),
-            ("PIC ID", r.get("pic_id")),
-            ("Dept ID", r.get("department_id")),
+            ("Status", _ref_name("status", r.get("status_id"))),
+            ("PIC", _ref_name("pic", r.get("pic_id"))),
+            ("Department", _ref_name("department", r.get("department_id"))),
         ]
 
     def editable(r):
@@ -245,16 +299,16 @@ def incident_list_flow() -> None:
             ("description", "Description", r.get("description") or ""),
             ("root_cause", "Root cause", r.get("root_cause") or ""),
             ("resolution", "Resolution", r.get("resolution") or ""),
-            ("status_id", "Status ID", r.get("status_id") or ""),
-            ("pic_id", "PIC ID", r.get("pic_id") or ""),
-            ("department_id", "Dept ID", r.get("department_id") or ""),
+            ("status_id", "Status", r.get("status_id"), "status"),
+            ("pic_id", "PIC", r.get("pic_id"), "pic"),
+            ("department_id", "Department", r.get("department_id"), "department"),
         ]
 
     browse(BrowserSpec(
         title="Incident",
         load=lambda limit, offset: IncidentService().list(limit=limit, offset=offset),
         fields=fields, editable_fields=editable, summary=summary,
-        save=lambda rid, ch: IncidentService().update(rid, **{k: (int(v) if v.isdigit() else v) for k, v in ch.items()}),
+        save=lambda rid, ch: IncidentService().update(rid, **{k: (int(v) if isinstance(v, str) and v.isdigit() else v) for k, v in ch.items()}),
         delete=lambda rid: IncidentService().delete(rid),
     ))
 
@@ -267,8 +321,12 @@ def change_add_flow() -> None:
         return
     ctype = _ask("Change type", default="Change")
     desc = _ask("Description")
+    status_id = _select_reference("status", "Status")
     try:
-        rec = ChangeService().create(date=date_, title=title, change_type=ctype, description=desc or None)
+        rec = ChangeService().create(
+            date=date_, title=title, change_type=ctype,
+            description=desc or None, status_id=status_id
+        )
         console.print(f"[green]✓ Change logged (id={rec['id']})[/green]")
     except Exception as exc:
         console.print(f"[red]! {exc}[/red]")
@@ -286,9 +344,9 @@ def change_list_flow() -> None:
             ("Date", r["date"]),
             ("Title", r["title"]),
             ("Type", r.get("change_type")),
-            ("Status ID", r.get("status_id")),
-            ("PIC ID", r.get("pic_id")),
-            ("Dept ID", r.get("department_id")),
+            ("Status", _ref_name("status", r.get("status_id"))),
+            ("PIC", _ref_name("pic", r.get("pic_id"))),
+            ("Department", _ref_name("department", r.get("department_id"))),
         ]
 
     def editable(r):
@@ -297,16 +355,16 @@ def change_list_flow() -> None:
             ("change_type", "Type", r.get("change_type") or ""),
             ("description", "Description", r.get("description") or ""),
             ("result", "Result", r.get("result") or ""),
-            ("status_id", "Status ID", r.get("status_id") or ""),
-            ("pic_id", "PIC ID", r.get("pic_id") or ""),
-            ("department_id", "Dept ID", r.get("department_id") or ""),
+            ("status_id", "Status", r.get("status_id"), "status"),
+            ("pic_id", "PIC", r.get("pic_id"), "pic"),
+            ("department_id", "Department", r.get("department_id"), "department"),
         ]
 
     browse(BrowserSpec(
         title="Change / Maint.",
         load=lambda limit, offset: ChangeService().list(limit=limit, offset=offset),
         fields=fields, editable_fields=editable, summary=summary,
-        save=lambda rid, ch: ChangeService().update(rid, **{k: (int(v) if v.isdigit() else v) for k, v in ch.items()}),
+        save=lambda rid, ch: ChangeService().update(rid, **{k: (int(v) if isinstance(v, str) and v.isdigit() else v) for k, v in ch.items()}),
         delete=lambda rid: ChangeService().delete(rid),
     ))
 
@@ -355,6 +413,84 @@ def evidence_list_flow() -> None:
         save=lambda rid, ch: EvidenceService().update(rid, **ch),
         delete=lambda rid: EvidenceService().delete(rid, remove_file=True),
     ))
+
+
+# --- Personnel / Master shortcuts ------------------------------------------
+def personnel_list_flow() -> None:
+    from app.cli.record_browser import browse, BrowserSpec
+
+    def load(limit, offset):
+        return MasterService().list("pic", limit=limit, offset=offset)
+
+    def summary(r):
+        return r.get("name") or str(r.get("id"))
+
+    def fields(r):
+        items = [(k, v) for k, v in r.items() if k not in ("id", "password")]
+        return items or [("id", r.get("id"))]
+
+    def editable(r):
+        out = [("name", "Name", r.get("name") or "")]
+        out.append(("department_id", "Department", r.get("department_id"), "department"))
+        out.append(("email", "Email", r.get("email") or ""))
+        return out
+
+    browse(BrowserSpec(
+        title="Personnel",
+        load=load, fields=fields, editable_fields=editable, summary=summary,
+        save=lambda rid, ch: MasterService().update("pic", rid, **ch),
+        delete=lambda rid: MasterService().delete("pic", rid),
+    ))
+
+
+def personnel_add_flow() -> None:
+    name = _ask("Name")
+    if not name:
+        console.print("[yellow]! name required[/yellow]")
+        return
+    dept = _select_reference("department", "Department")
+    email = _ask("Email")
+    try:
+        rec = MasterService().create("pic", name=name, department_id=dept, email=email or None)
+        console.print(f"[green]✓ PIC created (id={rec['id']})[/green]")
+    except Exception as exc:
+        console.print(f"[red]! {exc}[/red]")
+
+
+def department_list_flow() -> None:
+    from app.cli.record_browser import browse, BrowserSpec
+
+    def load(limit, offset):
+        return MasterService().list("department", limit=limit, offset=offset)
+
+    def summary(r):
+        return r.get("name") or str(r.get("id"))
+
+    def fields(r):
+        items = [(k, v) for k, v in r.items() if k not in ("id",)]
+        return items or [("id", r.get("id"))]
+
+    def editable(r):
+        return [("name", "Name", r.get("name") or "")]
+
+    browse(BrowserSpec(
+        title="Department",
+        load=load, fields=fields, editable_fields=editable, summary=summary,
+        save=lambda rid, ch: MasterService().update("department", rid, **ch),
+        delete=lambda rid: MasterService().delete("department", rid),
+    ))
+
+
+def department_add_flow() -> None:
+    name = _ask("Name")
+    if not name:
+        console.print("[yellow]! name required[/yellow]")
+        return
+    try:
+        rec = MasterService().create("department", name=name)
+        console.print(f"[green]✓ Department created (id={rec['id']})[/green]")
+    except Exception as exc:
+        console.print(f"[red]! {exc}[/red]")
 
 
 # --- Views ---------------------------------------------------------------

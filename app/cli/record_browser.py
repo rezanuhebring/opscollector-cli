@@ -279,12 +279,23 @@ def _do_edit(spec: BrowserSpec, rec_id: int) -> None:
             pass
         else:
             # edit current field
-            key_, label_, current_ = editable[i]
-            new_val = _edit_field(label_, str(current_))
+            raw = editable[i]
+            if len(raw) == 4:
+                key_, label_, current_, ref_entity = raw
+                from app.cli.menu_actions import _select_reference
+                new_val = _select_reference(ref_entity, label_)
+            else:
+                key_, label_, current_ = raw
+                new_val = _edit_field(label_, str(current_))
             if new_val is None:
                 continue
-            if new_val != str(current_):
+            if len(raw) == 4:
+                if new_val == current_:
+                    continue
                 changes[key_] = new_val
+            else:
+                if new_val != str(current_):
+                    changes[key_] = new_val
 
 
 def _do_create(spec: BrowserSpec) -> None:
