@@ -107,6 +107,49 @@ def _ref_name(entity: str, id_: int | None) -> str:
         return ""
 
 
+def _display_record(rec: dict, *, exclude: tuple[str, ...] = ("id", "password")) -> list[tuple[str, str]]:
+    # Maps a *_id field to the reference entity key used by MasterService/_ref_name.
+    # Compound names (evidence_category_id -> "evidence_category") can't be inferred by
+    # naive suffix-strip, so they are listed explicitly; unknown *_id falls back to raw id.
+    _REF_ENTITIES = {
+        "department_id": "department",
+        "pic_id": "pic",
+        "status_id": "status",
+        "evidence_category_id": "evidence_category",
+        "bau_activity_id": "bau_activity",
+        "change_category_id": "change_category",
+        "key_result_id": "key_result",
+        "incident_category_id": "incident_category",
+        "objective_id": "objective",
+    }
+    result: list[tuple[str, str]] = []
+    for key, value in rec.items():
+        if key in exclude:
+            continue
+        if value is None:
+            result.append((key.replace("_", " ").title(), "—"))
+            continue
+        if key == "is_active":
+            result.append(("Active", "Yes" if value else "No"))
+            continue
+        if key in ("created_at", "updated_at"):
+            result.append((key.replace("_", " ").title(), str(value)[:19]))
+            continue
+        if key.endswith("_id"):
+            entity = _REF_ENTITIES.get(key)
+            if entity:
+                name = _ref_name(entity, value)
+                result.append((entity.replace("_", " ").title(), name or str(value)))
+            else:
+                result.append((key.replace("_", " ").title(), str(value)))
+            continue
+        if isinstance(value, str) and not value and key.lower() in {"description", "desc"}:
+            result.append((key.replace("_", " ").title(), "—"))
+            continue
+        result.append((key.replace("_", " ").title(), str(value)))
+    return result or [("ID", str(rec.get("id")))]
+
+
 def _select_reference(entity: str, prompt: str) -> int | None:
     from app.cli.interactive import _read_key, DOWN, ENTER, ESC, UP
 
@@ -186,8 +229,7 @@ def master_list_flow() -> None:
         return r.get("name") or str(r.get("id"))
 
     def fields(r):
-        items = [(k, v) for k, v in r.items() if k not in ("id",)]
-        return items or [("id", r.get("id"))]
+        return _display_record(r)
 
     def editable(r):
         out = [("name", "Name", r.get("name") or "")]
@@ -390,15 +432,7 @@ def evidence_list_flow() -> None:
         return f"{r.get('title') or r['original_filename']} ({r['extension']})"
 
     def fields(r):
-        return [
-            ("Title", r.get("title") or r["original_filename"]),
-            ("Original file", r["original_filename"]),
-            ("Extension", r["extension"]),
-            ("Size (bytes)", r.get("size_bytes")),
-            ("Category ID", r.get("evidence_category_id")),
-            ("Entity", f"{r.get('entity_type')}#{r.get('entity_id')}"),
-            ("Uploaded", str(r.get("uploaded_at"))),
-        ]
+        return _display_record(r)
 
     def editable(r):
         return [
@@ -426,12 +460,11 @@ def personnel_list_flow() -> None:
         return r.get("name") or str(r.get("id"))
 
     def fields(r):
-        items = [(k, v) for k, v in r.items() if k not in ("id", "password")]
-        return items or [("id", r.get("id"))]
+        return _display_record(r)
 
     def editable(r):
         out = [("name", "Name", r.get("name") or "")]
-        out.append(("department_id", "Department", r.get("department_id"), "department"))
+        out.append(("department_id", "Department", r.get("department_id"), "ref", {"entity": "department"}))
         out.append(("email", "Email", r.get("email") or ""))
         return out
 
@@ -467,8 +500,7 @@ def department_list_flow() -> None:
         return r.get("name") or str(r.get("id"))
 
     def fields(r):
-        items = [(k, v) for k, v in r.items() if k not in ("id",)]
-        return items or [("id", r.get("id"))]
+        return _display_record(r)
 
     def editable(r):
         return [("name", "Name", r.get("name") or "")]
