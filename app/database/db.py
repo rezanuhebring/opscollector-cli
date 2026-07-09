@@ -69,13 +69,14 @@ def get_session() -> Iterator[Session]:
 
 
 def init_db() -> None:
-    """Create all tables (idempotent) and seed mandatory reference data."""
+    """Create all tables (idempotent), migrate extras, then seed reference data."""
     from app.core.logging_config import get_logger
     from app.database.seed import seed_reference_data
-    from app.models import Base
+    from app.models import Base, SyncLog
 
     engine = get_engine()
     Base.metadata.create_all(engine)
+    SyncLog.__table__.create(engine, checkfirst=True)
     get_logger("database").info("Database initialised at %s", get_settings().db_path)
     seed_reference_data()
 

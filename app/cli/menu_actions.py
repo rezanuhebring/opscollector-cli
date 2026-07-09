@@ -606,3 +606,30 @@ def about_flow() -> None:
     console.print("Keyboard menu: ↑↓ select, ←→ column, Enter open, Esc back/exit.")
     console.print("Shortcuts: F1 Help · F2 Save · F3 New · F4 Edit · F8 Delete · F9 Refresh.")
     _pause()
+
+
+def sync_flow() -> None:
+    from app.sync.engine import sync_once
+    from app.sync.transport import SyncClient
+
+    settings = reload_settings()
+    if not settings.sync.enabled or not settings.sync.server_url:
+        with get_session() as session:
+            from app.models import SyncLog
+            pending = session.query(SyncLog).filter(SyncLog.synced == 0).count()
+        if pending:
+            console.print(f"[yellow]offline — {pending} changes queued[/yellow]")
+        else:
+            console.print("[yellow]sync disabled or server not configured[/yellow]")
+        _pause()
+        return
+
+    client = SyncClient(
+        server_url=settings.sync.server_url,
+        api_token=settings.sync.api_token,
+        client_id=settings.client_id,
+    )
+    sync_once(client)
+    settings = reload_settings()
+    console.print(f"[green]sync complete[/green]")
+    _pause()

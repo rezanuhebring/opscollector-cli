@@ -26,6 +26,9 @@ from app.models import (
     Priority,
     Status,
 )
+from app.sync.capture import record_change
+
+PILOT_ENTITIES = {"pic", "department", "status"}
 
 # Master entity -> model mapping used by generic operations.
 MASTER_MODELS: dict[str, type] = {
@@ -106,7 +109,9 @@ class MasterService:
             session.add(obj)
             session.commit()
             session.refresh(obj)
-            return _to_dict(obj)
+            data = _to_dict(obj)
+        self._maybe_capture(entity, "create", data)
+        return data
 
     def update(self, entity: str, entity_id: int, **fields: Any) -> dict[str, Any]:
         model = self._resolve(entity)
@@ -120,7 +125,9 @@ class MasterService:
                 setattr(obj, key, value)
             session.commit()
             session.refresh(obj)
-            return _to_dict(obj)
+            data = _to_dict(obj)
+        self._maybe_capture(entity, "update", data)
+        return data
 
     def delete(self, entity: str, entity_id: int) -> None:
         model = self._resolve(entity)
@@ -130,6 +137,14 @@ class MasterService:
                 raise ValidationError(f"{entity} id={entity_id} not found")
             session.delete(obj)
             session.commit()
+        self._maybe_capture(entity, "delete", {"id": entity_id})
+
+    def _maybe_capture(self, entity: str, op: str, data: dict[str, Any]) -> None:
+        try:
+            row_id = int(data.get("id") or data.get("row_id") or 0)
+            record_change(entity, row_id, op, data)
+        except Exception:
+            pass
 
     # --- helpers ---
     def _resolve(self, entity: str) -> type:

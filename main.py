@@ -50,8 +50,10 @@ from app.cli.menu_actions import (
     personnel_add_flow,
     personnel_list_flow,
     search_flow,
+    sync_flow,
 )
 from app.core.logging_config import get_logger
+
 
 console = Console()
 logger = get_logger("cli")
@@ -142,6 +144,7 @@ def _build_menu() -> list[interactive.MenuItem]:
         interactive.MenuItem("Search", "Search operational data", search_flow),
         interactive.MenuItem("Load Demo Data", "Populate example data", load_demo_flow),
         interactive.MenuItem("Backup", "Create a timestamped backup", backup_flow),
+        interactive.MenuItem("Sync", "Sync changes with server", sync_flow),
         interactive.MenuItem("About", "Version and help", about_flow),
     ]
 

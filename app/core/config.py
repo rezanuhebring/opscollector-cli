@@ -49,6 +49,14 @@ class UIConfig(BaseModel):
     datetime_format: str = "%Y-%m-%d %H:%M:%S"
 
 
+class SyncConfig(BaseModel):
+    enabled: bool = False
+    server_url: str = ""
+    api_token: str = ""
+    last_push: str | None = None
+    last_pull: str | None = None
+
+
 class AppSettings(BaseModel):
     app_name: str = "OpsCollector-CLI"
     version: str = "1.0.0"
@@ -57,6 +65,8 @@ class AppSettings(BaseModel):
     evidence: EvidenceConfig = Field(default_factory=EvidenceConfig)
     logging: LoggingConfig = Field(default_factory=LoggingConfig)
     ui: UIConfig = Field(default_factory=UIConfig)
+    sync: SyncConfig = Field(default_factory=SyncConfig)
+    client_id: str = ""
 
     # --- Resolved path helpers (computed, not stored in JSON) ---
     @property
@@ -106,8 +116,9 @@ def get_settings() -> AppSettings:
     if not CONFIG_PATH.exists():
         # Fall back to defaults so the app can bootstrap itself on first run.
         return AppSettings()
+
     raw: dict[str, Any] = json.loads(CONFIG_PATH.read_text(encoding="utf-8"))
-    return AppSettings(**raw)
+    return _make(raw)
 
 
 def reload_settings() -> AppSettings:
@@ -118,3 +129,23 @@ def reload_settings() -> AppSettings:
         # get_settings may be replaced by a plain callable (e.g. in tests).
         pass
     return get_settings()
+
+
+def _ensure_client_id(raw: dict[str, Any]) -> tuple[dict[str, Any], bool]:
+    """Generate and persist a client_id if missing."""
+    if raw.get("client_id"):
+        return raw, False
+    raw["client_id"] = __import__("uuid").uuid4().hex
+    CONFIG_PATH.write_text(
+        json.dumps(AppSettings(**raw).model_dump(mode="json"), indent=2) + "\n",
+        encoding="utf-8",
+    )
+    return raw, True
+
+
+def _make(raw: dict[str, Any]) -> AppSettings:
+    raw, _ = _ensure_client_id(raw)
+    if "sync" not in raw:
+        raw["sync"] = {}
+
+    return AppSettings(**raw)

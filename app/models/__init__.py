@@ -23,6 +23,7 @@ from app.models.operational import (
     Incident,
     OKRProgress,
 )
+from app.models.sync_log import SyncLog
 
 __all__ = [
     "Base",
@@ -45,4 +46,6 @@ __all__ = [
     "Incident",
     "ChangeLog",
     "Evidence",
+    # sync
+    "SyncLog",
 ]
