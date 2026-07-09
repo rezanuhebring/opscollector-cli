@@ -368,7 +368,7 @@ def _do_edit(spec: BrowserSpec, rec_id: int) -> None:
                 continue
             changes[raw[0]] = new_val
             continue
-        if key in (UP, "DOWN"):
+        if key in ("UP", "DOWN"):
             if key == "DOWN":
                 i = (i + 1) % len(editable)
             else:
