@@ -240,11 +240,11 @@ def bau_list_flow() -> None:
 
     def editable(r):
         return [
-            ("title", "Title", r["title"]),
-            ("description", "Description", r.get("description") or ""),
-            ("status_id", "Status", r.get("status_id"), "status"),
-            ("pic_id", "PIC", r.get("pic_id"), "pic"),
-            ("department_id", "Department", r.get("department_id"), "department"),
+            ("title", "Title", r["title"], "text", {}),
+            ("description", "Description", r.get("description") or "", "text", {}),
+            ("status_id", "Status", r.get("status_id"), "ref", {"entity": "status"}),
+            ("pic_id", "PIC", r.get("pic_id"), "ref", {"entity": "pic"}),
+            ("department_id", "Department", r.get("department_id"), "ref", {"entity": "department"}),
         ]
 
     browse(BrowserSpec(
@@ -294,14 +294,14 @@ def incident_list_flow() -> None:
 
     def editable(r):
         return [
-            ("title", "Title", r["title"]),
-            ("severity", "Severity", r["severity"]),
-            ("description", "Description", r.get("description") or ""),
-            ("root_cause", "Root cause", r.get("root_cause") or ""),
-            ("resolution", "Resolution", r.get("resolution") or ""),
-            ("status_id", "Status", r.get("status_id"), "status"),
-            ("pic_id", "PIC", r.get("pic_id"), "pic"),
-            ("department_id", "Department", r.get("department_id"), "department"),
+            ("title", "Title", r["title"], "text", {}),
+            ("severity", "Severity", r["severity"], "combobox", {"values": ["Low", "Medium", "High", "Critical"]}),
+            ("description", "Description", r.get("description") or "", "text", {}),
+            ("root_cause", "Root cause", r.get("root_cause") or "", "text", {}),
+            ("resolution", "Resolution", r.get("resolution") or "", "text", {}),
+            ("status_id", "Status", r.get("status_id"), "ref", {"entity": "status"}),
+            ("pic_id", "PIC", r.get("pic_id"), "ref", {"entity": "pic"}),
+            ("department_id", "Department", r.get("department_id"), "ref", {"entity": "department"}),
         ]
 
     browse(BrowserSpec(
@@ -351,13 +351,13 @@ def change_list_flow() -> None:
 
     def editable(r):
         return [
-            ("title", "Title", r["title"]),
-            ("change_type", "Type", r.get("change_type") or ""),
-            ("description", "Description", r.get("description") or ""),
-            ("result", "Result", r.get("result") or ""),
-            ("status_id", "Status", r.get("status_id"), "status"),
-            ("pic_id", "PIC", r.get("pic_id"), "pic"),
-            ("department_id", "Department", r.get("department_id"), "department"),
+            ("title", "Title", r["title"], "text", {}),
+            ("change_type", "Type", r.get("change_type") or "", "text", {}),
+            ("description", "Description", r.get("description") or "", "text", {}),
+            ("result", "Result", r.get("result") or "", "text", {}),
+            ("status_id", "Status", r.get("status_id"), "ref", {"entity": "status"}),
+            ("pic_id", "PIC", r.get("pic_id"), "ref", {"entity": "pic"}),
+            ("department_id", "Department", r.get("department_id"), "ref", {"entity": "department"}),
         ]
 
     browse(BrowserSpec(

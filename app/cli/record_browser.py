@@ -78,6 +78,86 @@ def _edit_field(name: str, current: str) -> str | None:
     return val  # None == cancelled
 
 
+def _edit_date(name: str, current: str) -> str | None:
+    """Prompt for a date (YYYY-MM-DD); Esc cancels."""
+    import re
+    _DATE_RE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
+    while True:
+        val = _edit_field(name, current)
+        if val is None:
+            return None
+        if _DATE_RE.match(val):
+            return val
+        console.print("[yellow]! use YYYY-MM-DD[/yellow]")
+
+
+def _render_edit_mode(spec: BrowserSpec, rec: dict, changes: dict, i: int, total: int) -> None:
+    _clear_screen()
+    print(_TOP)
+    print(f"{_SIDE}  Edit {spec.title} #{rec.get('id')}{'':<48}{_SIDE}")
+    print(_SIDE + "─" * 72 + _SIDE)
+    for idx, raw in enumerate(spec.editable_fields(rec)):
+        key_ = raw[0]
+        label_ = raw[1]
+        cur = changes.get(key_, _current_display(raw, rec, changes))
+        ptr = "▸" if idx == i else " "
+        masked = "******" if key_.endswith("password") else str(cur)
+        print(f"{_SIDE} {ptr} {label_.ljust(14)}: {str(masked)[:56].ljust(56)}{_SIDE}")
+    print(_BOT)
+    print(
+        "  ↑↓ move     F4/Enter edit    F2 save    F1 help    Esc cancel all"
+    )
+
+
+def _current_display(raw, rec, changes):
+    if raw[0] in changes:
+        return changes[raw[0]]
+    return _field_current(raw, rec)
+
+
+def _field_current(raw, rec):
+    if len(raw) == 5:
+        key_ = raw[0]
+        widget = raw[3]
+        opts = raw[4] or {}
+        if widget == "ref":
+            entity = opts.get("entity")
+            from app.cli.menu_actions import _ref_name
+            return _ref_name(entity, rec.get(key_))
+        if widget == "combobox":
+            return rec.get(key_) or ""
+        if widget == "date":
+            return rec.get(key_) or ""
+    if len(raw) == 4:
+        from app.cli.menu_actions import _ref_name
+        return _ref_name(raw[3], rec.get(raw[0]))
+    return rec.get(raw[0], raw[2])
+
+
+def _open_editor(raw, rec):
+    key_ = raw[0]
+    label_ = raw[1]
+    cur = _current_display(raw, rec, {})
+    if len(raw) == 5:
+        widget = raw[3]
+        opts = raw[4] or {}
+        if widget == "ref":
+            entity = opts.get("entity")
+            from app.cli.menu_actions import _select_reference
+            return _select_reference(entity, label_)
+        if widget == "combobox":
+            from app.cli.interactive import combobox
+            return combobox(label_, opts.get("values", []), current=str(cur))
+        if widget == "date":
+            return _edit_date(label_, str(cur))
+        if widget == "text":
+            return _edit_field(label_, str(cur))
+    if len(raw) == 4:
+        from app.cli.menu_actions import _select_reference
+        return _select_reference(raw[3], label_)
+    return _edit_field(label_, str(cur))
+
+
 class BrowserSpec:
     """Declarative description of an entity for the browser."""
 
@@ -246,9 +326,12 @@ def _do_edit(spec: BrowserSpec, rec_id: int) -> None:
         return
     changes: dict = {}
     editable = spec.editable_fields(rec)
+    if not editable:
+        return
     i = 0
+
     while True:
-        _render_detail(spec, rec, editing=True, msg=f"Editing field {i+1}/{len(editable)} — Esc cancels all")
+        _render_edit_mode(spec, rec, changes, i, len(editable))
         key = _read_key()
         if key == ESC:
             if _confirm("Discard changes?"):
@@ -259,7 +342,6 @@ def _do_edit(spec: BrowserSpec, rec_id: int) -> None:
             continue
         if key == F2:
             if not changes:
-                _render_detail(spec, rec, editing=True, msg="Nothing changed")
                 _any_key_close()
                 continue
             try:
@@ -271,31 +353,27 @@ def _do_edit(spec: BrowserSpec, rec_id: int) -> None:
                 console.print(f"[red]! {exc}[/red]")
                 _any_key_close()
                 continue
-        if key in (ENTER, "DOWN") and i < len(editable) - 1:
-            i += 1
-        elif key == "UP" and i > 0:
-            i -= 1
-        elif key in ("UP", "DOWN"):
-            pass
-        else:
-            # edit current field
+        if key in (ENTER, F4):
             raw = editable[i]
-            if len(raw) == 4:
-                key_, label_, current_, ref_entity = raw
-                from app.cli.menu_actions import _select_reference
-                new_val = _select_reference(ref_entity, label_)
-            else:
-                key_, label_, current_ = raw
-                new_val = _edit_field(label_, str(current_))
+            new_val = _open_editor(raw, rec)
             if new_val is None:
                 continue
-            if len(raw) == 4:
-                if new_val == current_:
+            # For ref widgets new_val is an int id; _current_display returns a
+            # resolved name, so compare against the stored id when present.
+            if len(raw) == 5 and raw[3] == "ref":
+                stored = changes.get(raw[0], rec.get(raw[0]))
+                if new_val == stored:
                     continue
-                changes[key_] = new_val
+            elif new_val == _current_display(raw, rec, changes):
+                continue
+            changes[raw[0]] = new_val
+            continue
+        if key in (UP, "DOWN"):
+            if key == "DOWN":
+                i = (i + 1) % len(editable)
             else:
-                if new_val != str(current_):
-                    changes[key_] = new_val
+                i = (i - 1) % len(editable)
+            continue
 
 
 def _do_create(spec: BrowserSpec) -> None:

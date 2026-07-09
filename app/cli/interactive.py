@@ -210,6 +210,121 @@ def _pause() -> None:
         pass
 
 
+def _read_char() -> str:
+    """Read one printable character; discard extended/VT sequences."""
+    while True:
+        ch = msvcrt.getwch()
+        if ch in ("\x00", "\xe0"):
+            # extended: ignore scan code
+            msvcrt.getwch()
+            continue
+        if ch == "\r":
+            return ch
+        if ch == "\x1b":
+            return ch
+        if ch.isprintable():
+            return ch
+        return ""
+
+
+def combobox(prompt: str, options: list[str], *, current: str = "") -> str | None:
+    """Searchable combobox: type to filter, ↑/↓ navigate, Enter choose, Esc cancel."""
+    opts = list(dict.fromkeys(options))
+    if not opts:
+        return None
+    query = ""
+    idx = 0
+    while True:
+        filtered = [o for o in opts if query.lower() in o.lower()]
+        if filtered:
+            idx = max(0, min(idx, len(filtered) - 1))
+            selected = filtered[idx]
+        else:
+            selected = None
+        if sys.stdout.isatty():
+            sys.stdout.write("\x1b[2J\x1b[H")
+        line = "─" * 72
+        print(f"┌{line}┐")
+        print(f"│  {prompt}{'':<55}│")
+        print(f"├{line}┤")
+        print(f"│  Filter: {query[:50]}{' ' * 61}│")
+        print(f"├{line}┤")
+        for i, opt in enumerate(filtered[:10]):
+            ptr = "▸" if i == idx else " "
+            print(f"│ {ptr} {str(opt)[:50]:<50} │")
+        print(f"└{line}┘")
+        print("  Type to filter  ↑↓ navigate  Enter choose  Esc cancel")
+        sys.stdout.flush()
+        key = _read_key()
+        if key == ESC:
+            return None
+        if key == ENTER:
+            return selected if selected else None
+        if key == UP and filtered:
+            idx = (idx - 1) % len(filtered)
+            continue
+        if key == DOWN and filtered:
+            idx = (idx + 1) % len(filtered)
+            continue
+        # try to consume printable chars that may already be buffered
+        while True:
+            if not msvcrt.kbhit():
+                break
+            ch = _read_char()
+            if not ch:
+                break
+            if ch == ENTER:
+                return selected if selected else None
+            if ch == ESC:
+                return None
+            if ch in (UP, DOWN):
+                if ch == UP and filtered:
+                    idx = (idx - 1) % len(filtered)
+                elif ch == DOWN and filtered:
+                    idx = (idx + 1) % len(filtered)
+                continue
+            if ch.isprintable():
+                query += ch
+                idx = 0
+
+
+def choice(prompt: str, options: list[str], *, current: str = "") -> str | None:
+    """Non-searchable chooser: UP/DOWN/ENTER/ESC."""
+    opts = list(dict.fromkeys(options))
+    if not opts:
+        return None
+    idx = 0
+    if current and current in opts:
+        idx = opts.index(current)
+    while True:
+        if sys.stdout.isatty():
+            sys.stdout.write("\x1b[2J\x1b[H")
+        line = "─" * 72
+        print(f"┌{line}┐")
+        print(f"│  {prompt}{'':<55}│")
+        print(f"├{line}┤")
+        start = 0
+        visible = opts
+        if len(opts) > 10:
+            start = max(0, min(idx, len(opts) - 10))
+            visible = opts[start : start + 10]
+        for i, opt in enumerate(visible):
+            ptr = "▸" if start + i == idx else " "
+            print(f"│ {ptr} {str(opt)[:50]:<50} │")
+        print(f"└{line}┘")
+        print("  ↑↓ navigate  Enter choose  Esc cancel")
+        sys.stdout.flush()
+        key = _read_key()
+        if key == ESC:
+            return None
+        if key == ENTER:
+            return opts[idx]
+        if key == UP:
+            idx = (idx - 1) % len(opts)
+        elif key == DOWN:
+            idx = (idx + 1) % len(opts)
+
+
 # Standard function-key shortcuts, reusable across every module.
 GLOBAL_SHORTCUTS: list[tuple[str, str]] = [
     ("F1", "Help"),
