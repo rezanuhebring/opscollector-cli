@@ -1,0 +1,40 @@
+services:
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: opscollector
+      POSTGRES_USER: ops
+      POSTGRES_PASSWORD: opspass
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ops -d opscollector"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    environment:
+      DATABASE_URL: postgresql+psycopg2://ops:opspass@db:5432/opscollector
+      SECRET_KEY: changeme-internal
+      SERVER_SCHEMA_VERSION: "1"
+      ALLOWED_DRIFT: "0"
+    ports:
+      - "${API_HOST:-127.0.0.1}:${API_PORT:-9000}:8000"
+    depends_on:
+      db:
+        condition: service_healthy
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "python - <<'PY'\nimport urllib.request as U\nr=U.urlopen('http://127.0.0.1:8000/api/v1/health', timeout=3)\nassert r.status==200\nPY"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+      start_period: 10s
+
+volumes:
+  pgdata:
